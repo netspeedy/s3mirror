@@ -1,0 +1,320 @@
+name: Dependabot Merge
+
+run-name: "Dependabot Merge${{ github.event.workflow_run.pull_requests[0].number && format(' - PR #{0}', github.event.workflow_run.pull_requests[0].number) || ' - manual scan' }}"
+
+"on":
+  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Lint (Pull Requests)
+    types:
+      - completed
+    branches-ignore:
+      - main
+
+concurrency:
+  group: dependabot-merge-${{ github.event.workflow_run.head_branch || github.ref_name || github.run_id }}
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+  statuses: read
+
+jobs:
+  merge:
+    name: Review and Merge Dependabot Pull Requests
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'pull_request' &&
+        (
+          github.event.workflow_run.actor.login == 'dependabot[bot]' ||
+          github.event.workflow_run.actor.login == 'dependabot' ||
+          github.event.workflow_run.actor.login == 'app/dependabot'
+        )
+      )
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Identify candidate pull requests
+        id: candidates
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          WORKFLOW_RUN_PULL_REQUESTS: ${{ github.event_name == 'workflow_run' && toJson(github.event.workflow_run.pull_requests) || '[]' }}
+          WORKFLOW_RUN_HEAD_BRANCH: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || '' }}
+          WORKFLOW_RUN_HEAD_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '' }}
+        run: |
+          set -euo pipefail
+
+          prs="$(printf '%s\n' "${WORKFLOW_RUN_PULL_REQUESTS:-[]}" | jq -r '.[].number')"
+          prs="$(printf '%s\n' "${prs}" | sed '/^$/d')"
+
+          if [ -z "${prs}" ]; then
+            if [ -n "${WORKFLOW_RUN_HEAD_BRANCH:-}" ]; then
+              prs="$(
+                gh pr list --state open --head "${WORKFLOW_RUN_HEAD_BRANCH}" --json number \
+                  --jq '.[].number'
+              )"
+            else
+              prs="$(gh pr list --state open --json number --jq '.[].number')"
+            fi
+          fi
+
+          candidates=''
+          while IFS= read -r pr_number; do
+            [ -n "${pr_number}" ] || continue
+
+            pr_json="$(gh pr view "${pr_number}" --json number,author,baseRefName,headRefOid,state,isDraft)"
+            author="$(jq -r '.author.login // ""' <<<"${pr_json}")"
+            base_ref="$(jq -r '.baseRefName // ""' <<<"${pr_json}")"
+            state="$(jq -r '.state // ""' <<<"${pr_json}")"
+            draft="$(jq -r '.isDraft | tostring' <<<"${pr_json}")"
+            head_sha="$(jq -r '.headRefOid // ""' <<<"${pr_json}")"
+
+            if [ "${author}" != "dependabot[bot]" ] && [ "${author}" != "dependabot" ] && [ "${author}" != "app/dependabot" ]; then
+              echo "::notice::PR #${pr_number} skipped: author '${author}' is not Dependabot."
+              continue
+            fi
+            if [ "${base_ref}" != "${DEFAULT_BRANCH}" ] || [ "${state}" != "OPEN" ] || [ "${draft}" != "false" ]; then
+              echo "::notice::PR #${pr_number} skipped: base='${base_ref}' state='${state}' draft='${draft}'."
+              continue
+            fi
+            if [ -n "${WORKFLOW_RUN_HEAD_SHA:-}" ] && [ "${head_sha}" != "${WORKFLOW_RUN_HEAD_SHA}" ]; then
+              echo "::notice::PR #${pr_number} skipped: head '${head_sha}' differs from validated '${WORKFLOW_RUN_HEAD_SHA}'."
+              continue
+            fi
+
+            echo "::notice::PR #${pr_number} is a merge candidate."
+            candidates="${candidates}${pr_number}\n"
+          done <<< "${prs}"
+
+          prs="$(printf '%b' "${candidates}" | sed '/^$/d' | sort -u)"
+          count="$(printf '%s\n' "${prs}" | sed '/^$/d' | wc -l | tr -d ' ')"
+          echo "Candidate Dependabot PRs (count=${count}): ${prs:-none}"
+
+          {
+            echo "count=${count}"
+            echo "prs<<EOF"
+            printf '%s\n' "${prs}"
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Review and merge eligible pull requests
+        if: steps.candidates.outputs.count != '0'
+        env:
+          DEFAULT_GH_TOKEN: ${{ github.token }}
+          DEPENDABOT_AUTOMERGE_TOKEN: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          CANDIDATE_PRS: ${{ steps.candidates.outputs.prs }}
+          TRIGGERING_HEAD_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '' }}
+          TRIGGERING_RUN_URL: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.html_url || '' }}
+        run: |
+          set -euo pipefail
+
+          export GH_TOKEN="${DEPENDABOT_AUTOMERGE_TOKEN:-${DEFAULT_GH_TOKEN}}"
+
+          # shellcheck disable=SC2016
+          pr_query='
+          query($owner: String!, $name: String!, $number: Int!) {
+            repository(owner: $owner, name: $name) {
+              pullRequest(number: $number) {
+                number
+                title
+                url
+                state
+                isDraft
+                baseRefName
+                headRefOid
+                mergeable
+                mergeStateStatus
+                reviewDecision
+                author {
+                  login
+                }
+              }
+            }
+          }'
+
+          escape_markdown() {
+            printf '%s' "$1" | sed 's/|/\\|/g'
+          }
+
+          latest_successful_run() {
+            local workflow="$1"
+            local head_sha="$2"
+
+            gh run list \
+              --workflow "${workflow}" \
+              --limit 100 \
+              --json databaseId,headSha,event,conclusion,url \
+              --jq '.[] | select((.event == "pull_request" or .event == "workflow_dispatch") and .headSha == "'"${head_sha}"'" and .conclusion == "success") | @base64' \
+              | head -n1
+          }
+
+          validation_runs_for_head() {
+            local head_sha="$1"
+            local details=''
+
+            validation_run="$(latest_successful_run "Lint (Pull Requests)" "${head_sha}")"
+            if [ -z "${validation_run}" ]; then
+              return 1
+            fi
+
+            validation_url="$(printf '%s' "${validation_run}" | base64 --decode | jq -r '.url // ""')"
+            if [ -n "${validation_url}" ]; then
+              details="${details} Lint: ${validation_url}."
+            else
+              details="${details} Lint succeeded."
+            fi
+
+            printf '%s' "${details}"
+          }
+
+          {
+            printf '## Dependabot Merge\n\n'
+            printf '| Pull Request | Result | Details |\n'
+            printf '| --- | --- | --- |\n'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          merged=0
+          auto_merged=0
+          skipped=0
+
+          while IFS= read -r pr_number; do
+            [ -n "${pr_number}" ] || continue
+
+            pr_json="$(
+              gh api graphql \
+                -f owner="${GITHUB_REPOSITORY_OWNER}" \
+                -f name="${GITHUB_REPOSITORY#*/}" \
+                -F number="${pr_number}" \
+                -f query="${pr_query}" \
+                --jq '.data.repository.pullRequest'
+            )"
+
+            if [ "${pr_json}" = "null" ]; then
+              skipped=$((skipped + 1))
+              printf '| #%s | skipped | Pull request no longer exists. |\n' "${pr_number}" >> "${GITHUB_STEP_SUMMARY}"
+              continue
+            fi
+
+            title="$(jq -r '.title' <<<"${pr_json}")"
+            url="$(jq -r '.url' <<<"${pr_json}")"
+            author="$(jq -r '.author.login // ""' <<<"${pr_json}")"
+            state="$(jq -r '.state' <<<"${pr_json}")"
+            draft="$(jq -r '.isDraft' <<<"${pr_json}")"
+            base_ref="$(jq -r '.baseRefName' <<<"${pr_json}")"
+            head_sha="$(jq -r '.headRefOid // ""' <<<"${pr_json}")"
+            mergeable="$(jq -r '.mergeable' <<<"${pr_json}")"
+            merge_state_status="$(jq -r '.mergeStateStatus' <<<"${pr_json}")"
+            review_decision="$(jq -r '.reviewDecision // ""' <<<"${pr_json}")"
+
+            if [ "${author}" != "dependabot[bot]" ] && [ "${author}" != "dependabot" ] && [ "${author}" != "app/dependabot" ]; then
+              skipped=$((skipped + 1))
+              printf '| [#%s](%s) | skipped | Not a Dependabot pull request. |\n' "${pr_number}" "${url}" >> "${GITHUB_STEP_SUMMARY}"
+              continue
+            fi
+
+            if [ "${state}" != "OPEN" ] || [ "${draft}" != "false" ] || [ "${base_ref}" != "${DEFAULT_BRANCH}" ]; then
+              skipped=$((skipped + 1))
+              printf '| [#%s](%s) | skipped | Not an open, ready pull request against %s. |\n' "${pr_number}" "${url}" "${DEFAULT_BRANCH}" >> "${GITHUB_STEP_SUMMARY}"
+              continue
+            fi
+
+            if [ "${mergeable}" = "CONFLICTING" ] || [ "${merge_state_status}" = "DIRTY" ]; then
+              skipped=$((skipped + 1))
+              printf '| [#%s](%s) | skipped | Merge conflicts need manual attention. |\n' "${pr_number}" "${url}" >> "${GITHUB_STEP_SUMMARY}"
+              continue
+            fi
+
+            validation_detail=''
+            if [ -z "${head_sha}" ]; then
+              skipped=$((skipped + 1))
+              printf '| [#%s](%s) | skipped | Could not resolve the current PR head SHA. |\n' "${pr_number}" "${url}" >> "${GITHUB_STEP_SUMMARY}"
+              continue
+            fi
+
+            if [ -n "${TRIGGERING_HEAD_SHA:-}" ] && [ "${TRIGGERING_HEAD_SHA}" != "${head_sha}" ]; then
+              skipped=$((skipped + 1))
+              printf '| [#%s](%s) | skipped | The successful workflow run was for an older PR head revision. |\n' "${pr_number}" "${url}" >> "${GITHUB_STEP_SUMMARY}"
+              continue
+            fi
+
+            if [ -n "${TRIGGERING_RUN_URL:-}" ]; then
+              validation_detail=" Verified lint workflow for the current PR head revision: ${TRIGGERING_RUN_URL}."
+            elif ! validation_detail="$(validation_runs_for_head "${head_sha}")"; then
+              skipped=$((skipped + 1))
+              printf '| [#%s](%s) | skipped | Required validation workflow has not succeeded for the current PR head revision. |\n' "${pr_number}" "${url}" >> "${GITHUB_STEP_SUMMARY}"
+              continue
+            else
+              validation_detail=" Verified required workflow for the current PR head revision.${validation_detail}"
+            fi
+
+            approval_detail=''
+            if [ "${review_decision}" != "APPROVED" ]; then
+              if gh pr review "${pr_number}" --approve --body "Approved automatically after successful validation."; then
+                approval_detail=' Review approval was added automatically before merge.'
+              else
+                approval_detail=' Review approval was not added; repository rules may already be satisfied.'
+              fi
+            else
+              approval_detail=' Review approval was already present before merge.'
+            fi
+
+            merge_body="$(
+              printf '%s\n\n%s\n' \
+                'Automatically merged after the required validation workflow completed successfully for this Dependabot pull request.' \
+                "Original pull request: ${url}"
+            )"
+
+            merge_args=(
+              --squash
+              --delete-branch
+              --match-head-commit "${head_sha}"
+              --subject "${title}"
+              --body "${merge_body}"
+              "${pr_number}"
+            )
+
+            if merge_output="$(gh pr merge "${merge_args[@]}" 2>&1)"; then
+              merged=$((merged + 1))
+              detail="Merged after successful validation.${validation_detail}${approval_detail}"
+              printf '| [#%s](%s) | merged | %s |\n' "${pr_number}" "${url}" "$(escape_markdown "${detail}")" >> "${GITHUB_STEP_SUMMARY}"
+            elif printf '%s' "${merge_output}" | grep -Fq 'without workflows permission'; then
+              skipped=$((skipped + 1))
+              if [ -n "${DEPENDABOT_AUTOMERGE_TOKEN:-}" ]; then
+                detail="GitHub rejected the merge because the configured Dependabot merge token does not have enough workflow permissions for this PR."
+              else
+                detail="This PR updates workflow files. Add a DEPENDABOT_AUTOMERGE_TOKEN secret with contents, pull requests, and workflows write access to automate this class of PR."
+              fi
+              printf '| [#%s](%s) | skipped | %s |\n' "${pr_number}" "${url}" "$(escape_markdown "${detail}")" >> "${GITHUB_STEP_SUMMARY}"
+            elif printf '%s' "${merge_output}" | grep -Fq "add the \`--auto\` flag"; then
+              if auto_merge_output="$(gh pr merge --auto "${merge_args[@]}" 2>&1)"; then
+                auto_merged=$((auto_merged + 1))
+                detail="Enabled auto-merge after successful validation.${validation_detail}${approval_detail}"
+                printf '| [#%s](%s) | auto-merge | %s |\n' "${pr_number}" "${url}" "$(escape_markdown "${detail}")" >> "${GITHUB_STEP_SUMMARY}"
+              else
+                skipped=$((skipped + 1))
+                detail="$(printf '%s' "${auto_merge_output}" | tail -n1)"
+                printf '| [#%s](%s) | skipped | %s |\n' "${pr_number}" "${url}" "$(escape_markdown "${detail}")" >> "${GITHUB_STEP_SUMMARY}"
+              fi
+            else
+              skipped=$((skipped + 1))
+              detail="$(printf '%s' "${merge_output}" | tail -n1)"
+              printf '| [#%s](%s) | skipped | %s |\n' "${pr_number}" "${url}" "$(escape_markdown "${detail}")" >> "${GITHUB_STEP_SUMMARY}"
+            fi
+          done <<< "${CANDIDATE_PRS}"
+
+          printf '\nMerged: %s\n\nAuto-merge enabled: %s\n\nSkipped: %s\n' "${merged}" "${auto_merged}" "${skipped}" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Report when no candidate pull requests were found
+        if: steps.candidates.outputs.count == '0'
+        run: |
+          printf '## Dependabot Merge\n\nNo open Dependabot pull requests matched this run.\n' >> "${GITHUB_STEP_SUMMARY}"

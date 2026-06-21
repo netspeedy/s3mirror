@@ -161,7 +161,7 @@ content, `s3mirror` will treat them as already synchronized.
 - Destination credentials with permission to list buckets, create buckets, upload objects, and delete objects if mirror deletion is enabled
 - `pip` for installing Python dependencies
 
-The runtime dependencies are listed in [`requirements.txt`](requirements.txt):
+Runtime dependencies are listed in [`requirements.txt`](requirements.txt):
 
 - `boto3`
 - `urllib3`
@@ -476,11 +476,12 @@ versions.
   - runs `pylint`, `black --check`, and `isort --check-only`
 - `Auto-format`
   - runs on pushes to `main` and `master`
-  - formats `s3mirror.py` with pinned Black and isort versions
+  - installs Black and isort in CI
+  - formats `s3mirror.py` with Black and isort
   - commits formatting changes back when needed
 - `Dependabot`
-  - checks Python dependencies weekly
-  - opens up to ten dependency update pull requests
+  - checks Python dependencies and GitHub Actions weekly
+  - limits open update pull requests per ecosystem
 
 ### Local Maintainer Commands
 
@@ -503,7 +504,7 @@ s3mirror/
 │   │   └── logo.png
 │   ├── dependabot.yml
 │   └── workflows/
-│       ├── dependabot-auto-merge.yml
+│       ├── dependabot-merge.yml
 │       ├── format.yml
 │       └── lint.yml
 ├── .pylintrc

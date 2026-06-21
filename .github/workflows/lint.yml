@@ -1,4 +1,4 @@
-name: 🔍 Lint (Pull Requests)
+name: Lint (Pull Requests)
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   lint:
-    name: 🔍 Pylint (Python ${{ matrix.python-version }})
+    name: Pylint (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
 
     strategy:
@@ -34,29 +34,29 @@ jobs:
       run: |
         python -m pip install --upgrade pip setuptools wheel
         pip install -r requirements.txt
-        pip install "pylint" "black" "isort"
+        pip install black isort pylint
 
     - name: Run pylint
       run: |
-        echo "🔍 Running pylint..."
+        echo "Running pylint..."
         pylint s3mirror.py
 
     - name: Check formatting (black)
       run: |
-        echo "📝 Checking black formatting..."
+        echo "Checking black formatting..."
         black --check s3mirror.py
 
     - name: Check imports (isort)
       run: |
-        echo "📦 Checking import ordering..."
+        echo "Checking import ordering..."
         isort --check-only s3mirror.py
 
   success:
-    name: ✅ Lint Passed
+    name: Lint Passed
     runs-on: ubuntu-latest
     needs: lint
     if: success()
 
     steps:
     - name: Success
-      run: echo "✅ All linting checks passed!"
+      run: echo "All linting checks passed."
