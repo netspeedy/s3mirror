@@ -18,8 +18,10 @@ import logging
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
+from threading import Lock
 from typing import Dict, List, Optional, Set, Tuple
 
 import boto3
@@ -75,13 +77,17 @@ class ColoredFormatter(logging.Formatter):
     }
 
     def format(self, record):
+        original_levelname = record.levelname
         if hasattr(sys.stdout, "isatty") and sys.stdout.isatty():
             levelname = record.levelname
             if levelname in self.COLORS:
                 record.levelname = (
                     f"{self.COLORS[levelname]}{levelname}{self.COLORS['RESET']}"
                 )
-        return super().format(record)
+        try:
+            return super().format(record)
+        finally:
+            record.levelname = original_levelname
 
 
 class S3Mirror:  # pylint: disable=too-many-instance-attributes
@@ -98,6 +104,14 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
         self.max_concurrency = perf["max_concurrency"]
         self.max_pool_connections = perf["max_pool_connections"]
 
+        self.transfer_config = TransferConfig(
+            multipart_threshold=self.multipart_threshold,
+            multipart_chunksize=self.multipart_chunksize,
+            max_concurrency=self.max_concurrency,
+            use_threads=True,
+            max_io_queue=1000,
+        )
+
         self.delete_extraneous = config["sync"]["delete_extraneous"]
         self.exclude_buckets = set(config["sync"]["exclude_buckets"])
 
@@ -106,7 +120,8 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
         self.logger.debug("=" * 70)
         self.logger.debug("Source endpoint: %s", config["source"]["endpoint_url"])
         self.logger.debug(
-            "Source access key: %s", config["source"]["aws_access_key_id"]
+            "Source access key: %s",
+            self._redact(config["source"]["aws_access_key_id"]),
         )
         self.logger.debug(
             "Destination endpoint: %s",
@@ -114,7 +129,7 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
         )
         self.logger.debug(
             "Destination access key: %s",
-            config["destination"]["aws_access_key_id"],
+            self._redact(config["destination"]["aws_access_key_id"]),
         )
         self.logger.debug("Max workers: %d", self.max_workers)
         self.logger.debug(
@@ -131,6 +146,7 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
         self.source_client = self._create_client(config["source"], "SOURCE")
         self.dest_client = self._create_client(config["destination"], "DESTINATION")
 
+        self._stats_lock = Lock()
         self.stats = {
             "buckets_processed": 0,
             "buckets_created": 0,
@@ -315,22 +331,20 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
 
     def copy_object(self, bucket: str, key: str, size: int) -> bool:
         """Transfer single object from source to destination."""
+        body = None
         try:
             response = self.source_client.get_object(Bucket=bucket, Key=key)
             body = response["Body"]
 
-            transfer_config = TransferConfig(
-                multipart_threshold=self.multipart_threshold,
-                multipart_chunksize=self.multipart_chunksize,
-                max_concurrency=self.max_concurrency,
-                use_threads=True,
-                max_io_queue=1000,
+            self.dest_client.upload_fileobj(
+                body,
+                bucket,
+                key,
+                Config=self.transfer_config,
             )
 
-            self.dest_client.upload_fileobj(body, bucket, key, Config=transfer_config)
-            body.close()
-
-            self.stats["bytes_transferred"] += size
+            with self._stats_lock:
+                self.stats["bytes_transferred"] += size
 
             size_str = self._format_bytes(size)
             if size >= self.multipart_threshold:
@@ -342,6 +356,9 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
         except Exception as err:  # pylint: disable=broad-except
             self.logger.error("    ✗ Failed to copy %s: %s", key, err)
             return False
+        finally:
+            if body is not None:
+                body.close()
 
     def delete_object(self, bucket: str, key: str) -> bool:
         """Remove object from destination."""
@@ -373,6 +390,15 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
         hours = int(seconds // 3600)
         minutes = int((seconds % 3600) // 60)
         return f"{hours}h {minutes}m"
+
+    @staticmethod
+    def _redact(value: str) -> str:
+        """Mask access key values in debug output."""
+        if not value:
+            return "***"
+        if len(value) <= 8:
+            return "***"
+        return f"{value[:4]}...{value[-4:]}"
 
     def _calculate_differences(
         self,
@@ -675,7 +701,7 @@ def setup_logging(args: argparse.Namespace) -> logging.Logger:
 def load_config(config_path: Optional[str]) -> dict:
     """Load configuration from file or use defaults."""
     if not config_path:
-        return DEFAULT_CONFIG.copy()
+        return deepcopy(DEFAULT_CONFIG)
 
     config_file = Path(config_path)
 
@@ -685,9 +711,10 @@ def load_config(config_path: Optional[str]) -> dict:
 
     try:
         with open(config_file, "r", encoding="utf-8") as file:
-            if config_path.endswith(".json"):
+            config_suffix = config_file.suffix.lower()
+            if config_suffix == ".json":
                 user_config = json.load(file)
-            elif config_path.endswith(".yaml") or config_path.endswith(".yml"):
+            elif config_suffix in {".yaml", ".yml"}:
                 user_config = yaml.safe_load(file)
             else:
                 print(
@@ -696,18 +723,40 @@ def load_config(config_path: Optional[str]) -> dict:
                 )
                 sys.exit(1)
 
-        config = DEFAULT_CONFIG.copy()
-        for key in user_config:
-            if isinstance(user_config[key], dict):
-                config[key].update(user_config[key])
+        if user_config is None:
+            user_config = {}
+
+        if not isinstance(user_config, dict):
+            print(
+                "Error: Config file must contain a top-level mapping", file=sys.stderr
+            )
+            sys.exit(1)
+
+        config = deepcopy(DEFAULT_CONFIG)
+        for key, value in user_config.items():
+            if isinstance(config.get(key), dict) and isinstance(value, dict):
+                config[key].update(value)
             else:
-                config[key] = user_config[key]
+                config[key] = value
 
         return config
 
     except Exception as err:  # pylint: disable=broad-except
         print(f"Error loading config file: {err}", file=sys.stderr)
         sys.exit(1)
+
+
+def positive_int(value: str) -> int:
+    """Parse an argparse value that must be a positive integer."""
+    try:
+        parsed = int(value)
+    except ValueError as err:
+        raise argparse.ArgumentTypeError("must be an integer") from err
+
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be greater than zero")
+
+    return parsed
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -761,7 +810,7 @@ Examples:
     parser.add_argument(
         "-w",
         "--workers",
-        type=int,
+        type=positive_int,
         metavar="N",
         help="Number of parallel workers (default: 20)",
     )
@@ -790,7 +839,7 @@ def main():
 
     config = load_config(args.config)
 
-    if args.workers:
+    if args.workers is not None:
         config["performance"]["max_workers"] = args.workers
 
     if args.no_delete:
@@ -805,7 +854,10 @@ def main():
 
     logger = setup_logging(args)
 
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    if not config["source"].get("verify_ssl") or not config["destination"].get(
+        "verify_ssl"
+    ):
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     logger.info("=" * 70)
     logger.info("S3 BUCKET MIRROR")
