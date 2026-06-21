@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://github.com/netspeedy/s3mirror/actions/workflows/lint.yml"><img src="https://img.shields.io/github/actions/workflow/status/netspeedy/s3mirror/lint.yml?branch=main&style=flat-square&label=lint" alt="Lint"></a>
   <a href="https://github.com/netspeedy/s3mirror/actions/workflows/format.yml"><img src="https://img.shields.io/github/actions/workflow/status/netspeedy/s3mirror/format.yml?branch=main&style=flat-square&label=format" alt="Format"></a>
-  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.10%2B-3776AB.svg?style=flat-square&logo=python&logoColor=white" alt="Python"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB.svg?style=flat-square&logo=python&logoColor=white" alt="Python"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-2EA043.svg?style=flat-square" alt="License"></a>
   <a href="https://github.com/netspeedy/s3mirror/issues"><img src="https://img.shields.io/github/issues/netspeedy/s3mirror?style=flat-square" alt="Issues"></a>
 </p>
@@ -155,7 +155,7 @@ content, `s3mirror` will treat them as already synchronized.
 
 ## Prerequisites
 
-- Python `3.10+`
+- Python `3.11+`
 - Network access to both S3-compatible endpoints
 - Source credentials with permission to list buckets and read objects
 - Destination credentials with permission to list buckets, create buckets, upload objects, and delete objects if mirror deletion is enabled
@@ -471,7 +471,7 @@ versions.
 
 - `Lint`
   - runs on pull requests and manual dispatch
-  - tests Python `3.10`, `3.11`, `3.12`, and `3.13`
+  - tests Python `3.11`, `3.12`, `3.13`, and `3.14`
   - installs runtime and lint dependencies
   - runs `pylint`, `black --check`, and `isort --check-only`
 - `Auto-format`
