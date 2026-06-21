@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/assets/logo.svg" width="100%" alt="s3mirror">
+  <img src=".github/assets/logo.png" width="100%" alt="s3mirror">
 </p>
 
 <p align="center">
@@ -500,7 +500,7 @@ pylint s3mirror.py
 s3mirror/
 ├── .github/
 │   ├── assets/
-│   │   └── logo.svg
+│   │   └── logo.png
 │   ├── dependabot.yml
 │   └── workflows/
 │       ├── dependabot-auto-merge.yml
