@@ -1,42 +1,54 @@
-# 🪞 S3 Mirror
+<p align="center">
+  <img src=".github/assets/website/favicon.svg" width="96" height="96" alt="s3mirror">
+</p>
 
-> A Python utility for mirroring buckets and objects between S3-compatible endpoints.
+<h1 align="center">s3mirror</h1>
 
-[![Lint](https://img.shields.io/github/actions/workflow/status/soakes/s3mirror/lint.yml?branch=main&style=flat-square&label=lint)](https://github.com/soakes/s3mirror/actions/workflows/lint.yml)
-[![Format](https://img.shields.io/github/actions/workflow/status/soakes/s3mirror/format.yml?branch=main&style=flat-square&label=format)](https://github.com/soakes/s3mirror/actions/workflows/format.yml)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB.svg?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
-[![License](https://img.shields.io/badge/License-MIT-2EA043.svg?style=flat-square)](LICENSE)
-[![Issues](https://img.shields.io/github/issues/soakes/s3mirror?style=flat-square)](https://github.com/soakes/s3mirror/issues)
+<p align="center">
+  Mirror buckets and objects between S3-compatible endpoints — one script, one config, clear logs.
+</p>
+
+<p align="center">
+  <a href="https://github.com/netspeedy/s3mirror/actions/workflows/lint.yml"><img src="https://img.shields.io/github/actions/workflow/status/netspeedy/s3mirror/lint.yml?branch=main&style=flat-square&label=lint" alt="Lint"></a>
+  <a href="https://github.com/netspeedy/s3mirror/actions/workflows/format.yml"><img src="https://img.shields.io/github/actions/workflow/status/netspeedy/s3mirror/format.yml?branch=main&style=flat-square&label=format" alt="Format"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.10%2B-3776AB.svg?style=flat-square&logo=python&logoColor=white" alt="Python"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-2EA043.svg?style=flat-square" alt="License"></a>
+  <a href="https://github.com/netspeedy/s3mirror/issues"><img src="https://img.shields.io/github/issues/netspeedy/s3mirror?style=flat-square" alt="Issues"></a>
+</p>
+
+---
+
+**s3mirror** copies buckets and objects from one S3-compatible endpoint to
+another. It is intentionally direct: one script, one config file, and clear logs
+that are usable from an interactive shell, cron, systemd timers, or CI jobs.
 
 Built for operators who need a small, inspectable, automation-friendly mirror
 tool for AWS S3, MinIO, Ceph, Wasabi, Backblaze B2, and other S3-compatible
 storage systems.
 
-**Quick links:** [🚀 Quick Start](#quick-start) · [⚙️ Configuration](#configuration) · [🔄 How It Works](#how-it-works) · [🧪 Usage](#usage) · [🛡️ Safety Notes](#safety-notes) · [🤖 CI/CD](#cicd)
+**Quick links:** [Quick Start](#quick-start) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Usage](#usage) · [Safety Notes](#safety-notes) · [CI/CD](#cicd)
 
-<a id="table-of-contents"></a>
-## 🧭 Table of Contents
+## Table of Contents
 
-- [📖 Overview](#overview)
-- [✨ Capabilities](#capabilities)
-- [🔄 How It Works](#how-it-works)
-- [✅ Prerequisites](#prerequisites)
-- [🚀 Quick Start](#quick-start)
-- [⚙️ Configuration](#configuration)
-- [🧪 Usage](#usage)
-- [📋 Operational Behavior](#operational-behavior)
-- [📜 Logging](#logging)
-- [🛡️ Safety Notes](#safety-notes)
-- [🤖 CI/CD](#cicd)
-- [🗂️ Project Structure](#project-structure)
-- [🩺 Troubleshooting](#troubleshooting)
-- [🤝 Contributing](#contributing)
-- [📄 License](#license)
+- [Overview](#overview)
+- [Capabilities](#capabilities)
+- [How It Works](#how-it-works)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [Operational Behavior](#operational-behavior)
+- [Logging](#logging)
+- [Safety Notes](#safety-notes)
+- [CI/CD](#cicd)
+- [Project Structure](#project-structure)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-<a id="overview"></a>
-## 📖 Overview
+## Overview
 
 `s3mirror` copies buckets and objects from one S3-compatible endpoint to another.
 It is intentionally direct: one script, one config file, and clear logs that are
@@ -65,8 +77,7 @@ the same workflow can be pointed at most S3-compatible services.
 
 ---
 
-<a id="capabilities"></a>
-## ✨ Capabilities
+## Capabilities
 
 - **S3-compatible endpoints**: works with AWS S3 and S3-compatible APIs such as MinIO, Ceph, Wasabi, and Backblaze B2.
 - **Whole-bucket mirroring**: discovers source buckets and mirrors each one to the destination.
@@ -82,8 +93,7 @@ the same workflow can be pointed at most S3-compatible services.
 
 ---
 
-<a id="how-it-works"></a>
-## 🔄 How It Works
+## How It Works
 
 At runtime, `s3mirror` follows a simple reconciliation loop over every source
 bucket:
@@ -163,8 +173,7 @@ content, `s3mirror` will treat them as already synchronized.
 
 ---
 
-<a id="prerequisites"></a>
-## ✅ Prerequisites
+## Prerequisites
 
 - Python `3.10+`
 - Network access to both S3-compatible endpoints
@@ -180,13 +189,12 @@ The runtime dependencies are listed in [`requirements.txt`](requirements.txt):
 
 ---
 
-<a id="quick-start"></a>
-## 🚀 Quick Start
+## Quick Start
 
 Clone the repository and create a virtual environment:
 
 ```bash
-git clone https://github.com/soakes/s3mirror.git
+git clone https://github.com/netspeedy/s3mirror.git
 cd s3mirror
 python3 -m venv .venv
 source .venv/bin/activate
@@ -236,8 +244,7 @@ python3 s3mirror.py --config config.yaml --log-file /var/log/s3mirror.log
 
 ---
 
-<a id="configuration"></a>
-## ⚙️ Configuration
+## Configuration
 
 `s3mirror` accepts YAML and JSON configuration files. The top-level sections are:
 
@@ -314,8 +321,7 @@ python3 s3mirror.py --config config.yaml --show-config
 
 ---
 
-<a id="usage"></a>
-## 🧪 Usage
+## Usage
 
 ### Basic Run
 
@@ -382,8 +388,7 @@ using the process exit code for alerting.
 
 ---
 
-<a id="operational-behavior"></a>
-## 📋 Operational Behavior
+## Operational Behavior
 
 | Area | Behavior |
 |------|----------|
@@ -404,8 +409,7 @@ count.
 
 ---
 
-<a id="logging"></a>
-## 📜 Logging
+## Logging
 
 `s3mirror` has logging modes for both humans and schedulers:
 
@@ -430,8 +434,7 @@ the file can be tailed or rotated by external tooling.
 
 ---
 
-<a id="safety-notes"></a>
-## 🛡️ Safety Notes
+## Safety Notes
 
 `s3mirror` can delete data from the destination. Treat deletion as an operational
 choice, not a default assumption.
@@ -479,8 +482,7 @@ That makes the tool fast and simple, but it also means:
 
 ---
 
-<a id="cicd"></a>
-## 🤖 CI/CD
+## CI/CD
 
 GitHub Actions keeps the small codebase checked across supported Python
 versions.
@@ -512,12 +514,16 @@ pylint s3mirror.py
 
 ---
 
-<a id="project-structure"></a>
-## 🗂️ Project Structure
+## Project Structure
 
 ```text
 s3mirror/
 ├── .github/
+│   ├── assets/
+│   │   └── website/
+│   │       ├── favicon.svg
+│   │       ├── logo.svg
+│   │       └── og-image.svg
 │   ├── dependabot.yml
 │   └── workflows/
 │       ├── dependabot-auto-merge.yml
@@ -531,13 +537,12 @@ s3mirror/
 ```
 
 The repository keeps runtime behavior in [`s3mirror.py`](s3mirror.py), dependency
-pins in [`requirements.txt`](requirements.txt), and CI policy under
-[`.github/`](.github/).
+pins in [`requirements.txt`](requirements.txt), branding under
+[`.github/assets/`](.github/assets/), and CI policy under [`.github/`](.github/).
 
 ---
 
-<a id="troubleshooting"></a>
-## 🩺 Troubleshooting
+## Troubleshooting
 
 ### Connection Verification Fails
 
@@ -577,8 +582,7 @@ but the TLS risk still exists.
 
 ---
 
-<a id="contributing"></a>
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome. Useful areas include:
 
@@ -598,9 +602,6 @@ Before opening a pull request:
 
 ---
 
-<a id="license"></a>
-## 📄 License
+## License
 
 This project is licensed under the [MIT License](LICENSE).
-
-Developed by Simon Oakes.

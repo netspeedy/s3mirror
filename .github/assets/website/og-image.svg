@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="s3mirror — mirror buckets and objects between S3-compatible endpoints">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f1218"/>
+      <stop offset="1" stop-color="#0a0d13"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="22%" cy="38%" r="55%">
+      <stop offset="0" stop-color="#18a8ff" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#18a8ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bucket" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4bd8ff"/>
+      <stop offset="1" stop-color="#18a8ff"/>
+    </linearGradient>
+    <linearGradient id="arrow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f5b841"/>
+      <stop offset="1" stop-color="#e89a1e"/>
+    </linearGradient>
+    <linearGradient id="title" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f3f6fb"/>
+      <stop offset="1" stop-color="#aebccd"/>
+    </linearGradient>
+    <linearGradient id="rule" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#18a8ff" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#18a8ff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <rect x="0.75" y="0.75" width="1198.5" height="628.5" fill="none" stroke="#2d3d52" stroke-opacity="0.55"/>
+
+  <g transform="translate(96 188)">
+    <g fill="none" stroke="url(#bucket)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="44" cy="22" rx="22" ry="8"/>
+      <path d="M22 22 L30 96 L80 96 L88 22"/>
+      <ellipse cx="132" cy="22" rx="22" ry="8"/>
+      <path d="M110 22 L118 96 L168 96 L176 22"/>
+    </g>
+    <g fill="none" stroke="url(#arrow)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M64 60 C 80 42, 96 42, 112 60"/>
+      <path d="M112 60 L104 54 M112 60 L104 66"/>
+      <path d="M112 66 C 96 84, 80 84, 64 66"/>
+      <path d="M64 66 L72 72 M64 66 L72 60"/>
+    </g>
+  </g>
+
+  <text x="96" y="402" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+        font-size="86" font-weight="700" letter-spacing="1" fill="url(#title)">s3mirror</text>
+
+  <rect x="98" y="430" width="220" height="3" rx="1.5" fill="url(#rule)"/>
+
+  <text x="96" y="488" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+        font-size="30" font-weight="400" fill="#9fb1c4">Mirror buckets and objects between S3-compatible endpoints.</text>
+  <text x="96" y="532" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+        font-size="30" font-weight="400" fill="#9fb1c4">AWS S3, MinIO, Ceph, Wasabi, Backblaze B2 — one script, one config.</text>
+
+  <g transform="translate(96 566)" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="500">
+    <text fill="#6c8198">netspeedy</text>
+    <text x="118" fill="#43586d">/</text>
+    <text x="134" fill="#6c8198">s3mirror</text>
+  </g>
+</svg>
