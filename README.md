@@ -1,8 +1,6 @@
 <p align="center">
-  <img src=".github/assets/website/favicon.svg" width="96" height="96" alt="s3mirror">
+  <img src=".github/assets/logo.svg" width="100%" alt="s3mirror">
 </p>
-
-<h1 align="center">s3mirror</h1>
 
 <p align="center">
   Mirror buckets and objects between S3-compatible endpoints — one script, one config, clear logs.
@@ -27,24 +25,6 @@ tool for AWS S3, MinIO, Ceph, Wasabi, Backblaze B2, and other S3-compatible
 storage systems.
 
 **Quick links:** [Quick Start](#quick-start) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Usage](#usage) · [Safety Notes](#safety-notes) · [CI/CD](#cicd)
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Capabilities](#capabilities)
-- [How It Works](#how-it-works)
-- [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Operational Behavior](#operational-behavior)
-- [Logging](#logging)
-- [Safety Notes](#safety-notes)
-- [CI/CD](#cicd)
-- [Project Structure](#project-structure)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
-- [License](#license)
 
 ---
 
@@ -520,10 +500,7 @@ pylint s3mirror.py
 s3mirror/
 ├── .github/
 │   ├── assets/
-│   │   └── website/
-│   │       ├── favicon.svg
-│   │       ├── logo.svg
-│   │       └── og-image.svg
+│   │   └── logo.svg
 │   ├── dependabot.yml
 │   └── workflows/
 │       ├── dependabot-auto-merge.yml
