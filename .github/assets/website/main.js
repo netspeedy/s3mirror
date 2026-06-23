@@ -15,6 +15,7 @@ const defaultMetadata = {
   github_url: "https://github.com/netspeedy/s3mirror",
   release_url: "https://github.com/netspeedy/s3mirror/releases",
   homebrew_url: "https://github.com/netspeedy/homebrew-s3mirror",
+  container_url: "https://github.com/netspeedy/s3mirror/pkgs/container/s3mirror",
   latest_release: null,
   release_commit: "",
 };
@@ -27,6 +28,7 @@ function normalizeMetadata(metadata = {}) {
     github_url: metadata.github_url || defaultMetadata.github_url,
     release_url: metadata.release_url || defaultMetadata.release_url,
     homebrew_url: metadata.homebrew_url || defaultMetadata.homebrew_url,
+    container_url: metadata.container_url || defaultMetadata.container_url,
     latest_release: metadata.latest_release || null,
     release_commit: metadata.release_commit || "",
   };
@@ -121,7 +123,13 @@ function setHref(id, value) {
 }
 
 function renderCommands(metadata) {
-  const releaseTag = metadata.latest_release?.tag_name || "v1.0.2";
+  const releaseTag = metadata.latest_release?.tag_name || "v1.0.3";
+  const imageTag = releaseTag.replace(/^v/, "");
+
+  setText(
+    "container-command",
+    `docker pull ghcr.io/netspeedy/s3mirror:${imageTag}\ndocker run --rm \\\n  -v "$PWD/config.yaml:/config/config.yaml:ro" \\\n  ghcr.io/netspeedy/s3mirror:${imageTag} \\\n  --config /config/config.yaml --no-delete`,
+  );
 
   setText("homebrew-command", "brew tap netspeedy/s3mirror\nbrew install s3mirror");
   setText(
@@ -142,12 +150,15 @@ function renderMetadata(rawMetadata) {
   setHref("site-home-link", metadata.site_url);
   setHref("nav-github-link", metadata.github_url);
   setHref("nav-releases-link", metadata.release_url);
+  setHref("nav-container-link", metadata.container_url);
   setHref("nav-homebrew-link", metadata.homebrew_url);
   setHref("nav-docs-link", `${metadata.github_url}#readme`);
   setHref("hero-docs-link", `${metadata.github_url}#readme`);
+  setHref("install-container-link", metadata.container_url);
   setHref("install-homebrew-link", metadata.homebrew_url);
   setHref("install-source-link", metadata.release_url);
   setHref("footer-release-link", release?.html_url || metadata.release_url);
+  setHref("footer-container-link", metadata.container_url);
 
   setText("release-version", release?.tag_name || "Awaiting release");
   setText("release-date", formatDate(release?.published_at));

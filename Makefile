@@ -1,6 +1,13 @@
 WEBSITE_DIR ?= .github/assets/website
+IMAGE ?= s3mirror:local
 
-.PHONY: website-install website-check website-build website-dev
+.PHONY: container-build container-smoke website-install website-check website-build website-dev
+
+container-build:
+	docker build --pull --tag $(IMAGE) .
+
+container-smoke: container-build
+	docker run --rm $(IMAGE) --version
 
 website-install:
 	npm --prefix $(WEBSITE_DIR) install

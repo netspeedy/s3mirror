@@ -9,6 +9,8 @@
 <p align="center">
   <a href="https://github.com/netspeedy/s3mirror/actions/workflows/lint.yml"><img src="https://img.shields.io/github/actions/workflow/status/netspeedy/s3mirror/lint.yml?branch=main&style=flat-square&label=lint" alt="Lint"></a>
   <a href="https://github.com/netspeedy/s3mirror/actions/workflows/format.yml"><img src="https://img.shields.io/github/actions/workflow/status/netspeedy/s3mirror/format.yml?branch=main&style=flat-square&label=format" alt="Format"></a>
+  <a href="https://github.com/netspeedy/s3mirror/actions/workflows/container-image.yml"><img src="https://img.shields.io/github/actions/workflow/status/netspeedy/s3mirror/container-image.yml?style=flat-square&label=container" alt="Container"></a>
+  <a href="https://github.com/netspeedy/s3mirror/pkgs/container/s3mirror"><img src="https://img.shields.io/badge/GHCR-s3mirror-38d99f.svg?style=flat-square&logo=github" alt="GHCR package"></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB.svg?style=flat-square&logo=python&logoColor=white" alt="Python"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-2EA043.svg?style=flat-square" alt="License"></a>
   <a href="https://github.com/netspeedy/s3mirror/issues"><img src="https://img.shields.io/github/issues/netspeedy/s3mirror?style=flat-square" alt="Issues"></a>
@@ -24,7 +26,7 @@ Built for operators who need a small, inspectable, automation-friendly mirror
 tool for AWS S3, MinIO, Ceph, Wasabi, Backblaze B2, and other S3-compatible
 storage systems.
 
-**Quick links:** [Quick Start](#quick-start) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Usage](#usage) · [Safety Notes](#safety-notes) · [CI/CD](#cicd)
+**Quick links:** [Quick Start](#quick-start) · [Container Image](#container-image) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Usage](#usage) · [Safety Notes](#safety-notes) · [CI/CD](#cicd)
 
 ---
 
@@ -160,6 +162,7 @@ content, `s3mirror` will treat them as already synchronized.
 - Source credentials with permission to list buckets and read objects
 - Destination credentials with permission to list buckets, create buckets, upload objects, and delete objects if mirror deletion is enabled
 - `pip` for installing Python dependencies
+- Docker or another OCI-compatible runtime if using the published container image
 
 Runtime dependencies are listed in [`requirements.txt`](requirements.txt):
 
@@ -221,6 +224,44 @@ When the output looks correct, run with the deletion behavior from the config:
 ```bash
 python3 s3mirror.py --config config.yaml --log-file /var/log/s3mirror.log
 ```
+
+---
+
+## Container Image
+
+Stable releases are published to GitHub Container Registry as
+[`ghcr.io/netspeedy/s3mirror`](https://github.com/netspeedy/s3mirror/pkgs/container/s3mirror).
+
+Pull the latest stable image:
+
+```bash
+docker pull ghcr.io/netspeedy/s3mirror:latest
+```
+
+Run a copy-only validation pass with a mounted config file:
+
+```bash
+docker run --rm \
+  -v "$PWD/config.yaml:/config/config.yaml:ro" \
+  ghcr.io/netspeedy/s3mirror:latest \
+  --config /config/config.yaml --no-delete --debug
+```
+
+Pin a specific release for scheduled jobs:
+
+```bash
+docker run --rm \
+  -v /etc/s3mirror.yaml:/config/config.yaml:ro \
+  -v /var/log/s3mirror:/logs \
+  ghcr.io/netspeedy/s3mirror:1.0.3 \
+  --config /config/config.yaml \
+  --log-file /logs/s3mirror.log \
+  --quiet
+```
+
+Published image tags include `latest`, the full semantic version such as
+`1.0.3`, the major/minor tag such as `1.0`, and the Git tag form such as
+`v1.0.3`.
 
 ---
 
@@ -474,13 +515,18 @@ versions.
   - tests Python `3.11`, `3.12`, `3.13`, and `3.14`
   - installs runtime and lint dependencies
   - runs `pylint`, `black --check`, and `isort --check-only`
+  - builds the container image and checks `s3mirror --version`
 - `Auto-format`
   - runs on pushes to `main` and `master`
   - installs Black and isort in CI
   - formats `s3mirror.py` with Black and isort
   - commits formatting changes back when needed
+- `Container Image`
+  - runs on stable release tags and manual dispatch
+  - verifies the tag points to `main` and matches `s3mirror.py --version`
+  - publishes multi-architecture `linux/amd64` and `linux/arm64` images to GHCR
 - `Dependabot`
-  - checks Python dependencies and GitHub Actions weekly
+  - checks Python dependencies, Docker base images, GitHub Actions, and website packages weekly
   - limits open update pull requests per ecosystem
 
 ### Local Maintainer Commands
@@ -491,6 +537,7 @@ python3 -m pip install black isort pylint
 black s3mirror.py
 isort s3mirror.py
 pylint s3mirror.py
+make container-smoke
 ```
 
 ---
@@ -501,22 +548,33 @@ pylint s3mirror.py
 s3mirror/
 ├── .github/
 │   ├── assets/
-│   │   └── logo.png
+│   │   └── website/
 │   ├── dependabot.yml
 │   └── workflows/
+│       ├── automated-release.yml
+│       ├── container-image.yml
 │       ├── dependabot-merge.yml
+│       ├── deploy-pages-site.yml
 │       ├── format.yml
-│       └── lint.yml
+│       ├── lint.yml
+│       └── publish-homebrew-formula.yml
+├── .dockerignore
 ├── .pylintrc
+├── Dockerfile
 ├── LICENSE
+├── Makefile
 ├── README.md
+├── assets/
+│   └── logo.png
 ├── requirements.txt
 └── s3mirror.py
 ```
 
 The repository keeps runtime behavior in [`s3mirror.py`](s3mirror.py), dependency
-pins in [`requirements.txt`](requirements.txt), branding under
-[`.github/assets/`](.github/assets/), and CI policy under [`.github/`](.github/).
+pins in [`requirements.txt`](requirements.txt), the container image in
+[`Dockerfile`](Dockerfile), the website under
+[`.github/assets/website/`](.github/assets/website/), the README logo under
+[`assets/`](assets/), and CI policy under [`.github/`](.github/).
 
 ---
 

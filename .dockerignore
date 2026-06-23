@@ -1,0 +1,9 @@
+.git
+.github/assets/website/node_modules
+.github/assets/website/dist
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.log
+.DS_Store

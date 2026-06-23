@@ -75,12 +75,24 @@ jobs:
     - name: Build website
       run: make website-build
 
+  container:
+    name: Container Build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v7
+
+    - name: Build and smoke-test image
+      run: make container-smoke
+
   success:
     name: Lint Passed
     runs-on: ubuntu-latest
     needs:
       - lint
       - website
+      - container
     if: success()
 
     steps:

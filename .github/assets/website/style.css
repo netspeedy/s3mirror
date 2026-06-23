@@ -653,6 +653,10 @@ a.install-directory-row[data-channel="homebrew"] {
   --channel-accent: var(--amber);
 }
 
+a.install-directory-row[data-channel="container"] {
+  --channel-accent: var(--green);
+}
+
 a.install-directory-row[data-channel="archives"] {
   --channel-accent: var(--blue-strong);
 }

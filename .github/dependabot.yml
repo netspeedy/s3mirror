@@ -16,6 +16,14 @@ updates:
       time: "03:15"
     open-pull-requests-limit: 5
 
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:20"
+    open-pull-requests-limit: 5
+
   - package-ecosystem: "npm"
     directory: "/.github/assets/website"
     schedule:

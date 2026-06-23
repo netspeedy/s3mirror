@@ -38,6 +38,7 @@
         </span>
       </a>
       <nav class="masthead-links" aria-label="Primary navigation">
+        <a href="https://github.com/netspeedy/s3mirror/pkgs/container/s3mirror" id="nav-container-link" data-install-tab="container">Container</a>
         <a href="https://github.com/netspeedy/homebrew-s3mirror" id="nav-homebrew-link" data-install-tab="homebrew">Homebrew</a>
         <a href="https://github.com/netspeedy/s3mirror/releases" id="nav-releases-link">Releases</a>
         <a href="https://github.com/netspeedy/s3mirror#readme" id="nav-docs-link">Docs</a>
@@ -81,7 +82,7 @@
       <section class="metadata wrapper">
         <div class="section-heading">
           <p class="eyebrow">Release details</p>
-          <h2>Latest <span class="accent">stable</span> source release.</h2>
+          <h2>Latest <span class="accent">stable</span> release.</h2>
         </div>
         <div class="release-grid">
           <div class="release-info">
@@ -100,8 +101,8 @@
               </div>
             </div>
             <div class="release-note">
-              <span>Runtime dependencies</span>
-              <code>boto3 / urllib3 / PyYAML</code>
+              <span>Published packages</span>
+              <code>GHCR image / Homebrew tap / source archive</code>
             </div>
           </div>
           <div class="release-highlights">
@@ -142,14 +143,25 @@
         </div>
         <div class="install-tabs">
           <div class="tab-bar" role="tablist" aria-label="Installation methods">
-            <button class="tab active" type="button" role="tab" data-tab="homebrew" aria-selected="true">Homebrew</button>
+            <button class="tab active" type="button" role="tab" data-tab="container" aria-selected="true">Container</button>
+            <button class="tab" type="button" role="tab" data-tab="homebrew" aria-selected="false">Homebrew</button>
             <button class="tab" type="button" role="tab" data-tab="venv" aria-selected="false">Virtualenv</button>
             <button class="tab" type="button" role="tab" data-tab="source" aria-selected="false">Source archive</button>
           </div>
           <div class="tab-panels">
-            <div class="tab-panel active" id="panel-homebrew" role="tabpanel">
+            <div class="tab-panel active" id="panel-container" role="tabpanel">
               <div class="tab-description">
                 <span class="install-badge">Recommended</span>
+                <p>Linux containers. Pulls the release image from GitHub Container Registry.</p>
+              </div>
+              <div class="code-block"><pre><code id="container-command">docker pull ghcr.io/netspeedy/s3mirror:latest
+docker run --rm \
+  -v "$PWD/config.yaml:/config/config.yaml:ro" \
+  ghcr.io/netspeedy/s3mirror:latest \
+  --config /config/config.yaml --no-delete</code></pre></div>
+            </div>
+            <div class="tab-panel" id="panel-homebrew" role="tabpanel">
+              <div class="tab-description">
                 <p>macOS and Linux. Tracks stable releases through the Netspeedy tap.</p>
               </div>
               <div class="code-block"><pre><code id="homebrew-command">brew tap netspeedy/s3mirror
@@ -169,7 +181,7 @@ pip install -r requirements.txt</code></pre></div>
               <div class="tab-description">
                 <p>Fetch a tagged source archive directly from GitHub Releases.</p>
               </div>
-              <div class="code-block"><pre><code id="source-command">curl -L https://github.com/netspeedy/s3mirror/archive/refs/tags/v1.0.1.tar.gz -o s3mirror-v1.0.1.tar.gz</code></pre></div>
+              <div class="code-block"><pre><code id="source-command">curl -L https://github.com/netspeedy/s3mirror/archive/refs/tags/v1.0.3.tar.gz -o s3mirror-v1.0.3.tar.gz</code></pre></div>
             </div>
           </div>
           <div class="install-directory" aria-label="Published install channels">
@@ -178,8 +190,13 @@ pip install -r requirements.txt</code></pre></div>
               <span>Use case</span>
               <span>Package source</span>
             </div>
+            <a class="install-directory-row" data-channel="container" href="https://github.com/netspeedy/s3mirror/pkgs/container/s3mirror" id="install-container-link" aria-label="Container image - schedulers and Linux hosts">
+              <span class="channel-chip"><span class="channel-dot"></span>Container<span class="channel-tag">Recommended</span></span>
+              <span>Schedulers and Linux hosts</span>
+              <span class="source-link">GHCR image<span class="source-arrow" aria-hidden="true">↗</span></span>
+            </a>
             <a class="install-directory-row" data-channel="homebrew" href="https://github.com/netspeedy/homebrew-s3mirror" id="install-homebrew-link" aria-label="Homebrew tap - macOS and Linux workstations">
-              <span class="channel-chip"><span class="channel-dot"></span>Homebrew<span class="channel-tag">Recommended</span></span>
+              <span class="channel-chip"><span class="channel-dot"></span>Homebrew</span>
               <span>macOS and Linux workstations</span>
               <span class="source-link">Homebrew tap<span class="source-arrow" aria-hidden="true">↗</span></span>
             </a>
@@ -216,6 +233,7 @@ pip install -r requirements.txt</code></pre></div>
             </div>
             <div class="footer-col">
               <h4>Install</h4>
+              <a href="https://github.com/netspeedy/s3mirror/pkgs/container/s3mirror" id="footer-container-link">Container image</a>
               <a href="https://github.com/netspeedy/homebrew-s3mirror">Homebrew tap</a>
               <a href="https://github.com/netspeedy/s3mirror/releases/latest">Latest release</a>
             </div>

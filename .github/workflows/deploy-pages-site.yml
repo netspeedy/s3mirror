@@ -7,6 +7,7 @@ on:
   workflow_run:
     workflows:
       - Automated Release
+      - Container Image
       - Publish Homebrew Formula
     types:
       - completed
@@ -99,6 +100,7 @@ jobs:
             --arg github_url "https://github.com/${GITHUB_REPOSITORY}" \
             --arg release_url "https://github.com/${GITHUB_REPOSITORY}/releases" \
             --arg homebrew_url "https://github.com/${{ github.repository_owner }}/homebrew-${{ github.event.repository.name }}" \
+            --arg container_url "https://github.com/${GITHUB_REPOSITORY}/pkgs/container/${{ github.event.repository.name }}" \
             --arg release_commit "${{ steps.latest.outputs.commit }}" \
             --argjson latest_release "${latest_release_json}" \
             '{
@@ -107,6 +109,7 @@ jobs:
               github_url: $github_url,
               release_url: $release_url,
               homebrew_url: $homebrew_url,
+              container_url: $container_url,
               release_commit: $release_commit,
               latest_release: $latest_release
             }' > site/website-metadata.json

@@ -17,6 +17,7 @@ const requiredFiles = [
 
 const requiredDOMIDs = [
   "site-home-link",
+  "nav-container-link",
   "nav-homebrew-link",
   "nav-releases-link",
   "nav-docs-link",
@@ -26,12 +27,15 @@ const requiredDOMIDs = [
   "release-date",
   "release-commit",
   "release-highlights",
+  "container-command",
   "homebrew-command",
   "venv-command",
   "source-command",
+  "install-container-link",
   "install-homebrew-link",
   "install-source-link",
   "footer-release-link",
+  "footer-container-link",
   "footer-version",
   "footer-commit",
 ];
@@ -92,7 +96,7 @@ for (const domID of requiredDOMIDs) {
   assert(indexHTML.includes(`id="${domID}"`), `index.html is missing required id="${domID}"`);
 }
 
-for (const tabID of ["homebrew", "venv", "source"]) {
+for (const tabID of ["container", "homebrew", "venv", "source"]) {
   assert(indexHTML.includes(`data-tab="${tabID}"`), `index.html is missing data-tab="${tabID}"`);
   assert(indexHTML.includes(`id="panel-${tabID}"`), `index.html is missing id="panel-${tabID}"`);
 }
