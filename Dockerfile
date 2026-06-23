@@ -1,4 +1,4 @@
-FROM python:3.13-slim
+FROM python:3.14-slim
 
 LABEL org.opencontainers.image.title="s3mirror" \
       org.opencontainers.image.description="Automation-friendly S3 bucket mirroring for S3-compatible endpoints" \
