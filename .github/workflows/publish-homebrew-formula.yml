@@ -1,0 +1,140 @@
+name: Publish Homebrew Formula
+
+on:
+  push:
+    tags:
+      - v*
+  workflow_dispatch:
+    inputs:
+      release_ref:
+        description: Stable release tag to publish, for example v1.0.0
+        required: false
+        type: string
+
+concurrency:
+  group: publish-homebrew-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_ref || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.release_ref || github.sha }}
+  RELEASE_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.release_ref || github.ref_name }}
+
+jobs:
+  verify-release-tag:
+    name: Verify Release Tag
+    if: |
+      (startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-rc.')) ||
+      (github.event_name == 'workflow_dispatch' && startsWith(inputs.release_ref || '', 'v') && !contains(inputs.release_ref || '', '-rc.'))
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ env.CHECKOUT_REF }}
+
+      - name: Ensure release tag points to main
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          default_branch="${DEFAULT_BRANCH}"
+          release_commit="$(git rev-parse HEAD^0)"
+
+          git fetch origin "${default_branch}:refs/remotes/origin/${default_branch}" --force
+          git merge-base --is-ancestor "${release_commit}" "refs/remotes/origin/${default_branch}"
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Verify app version matches release tag
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+          expected_version="${RELEASE_REF#v}"
+          app_version="$(python s3mirror.py --version | sed -E 's/^S3 Mirror v//')"
+
+          if [ "${app_version}" != "${expected_version}" ]; then
+            printf 'release tag %s does not match app version %s\n' "${RELEASE_REF}" "${app_version}" >&2
+            exit 1
+          fi
+
+  publish:
+    name: Publish Homebrew Formula
+    if: |
+      (startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-rc.')) ||
+      (github.event_name == 'workflow_dispatch' && startsWith(inputs.release_ref || '', 'v') && !contains(inputs.release_ref || '', '-rc.'))
+    needs:
+      - verify-release-tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ env.CHECKOUT_REF }}
+
+      - name: Resolve release archive
+        id: formula
+        run: |
+          version="${RELEASE_REF#v}"
+          archive_url="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${RELEASE_REF}.tar.gz"
+          archive_path="${RUNNER_TEMP}/s3mirror-${RELEASE_REF}.tar.gz"
+
+          for attempt in $(seq 1 12); do
+            if curl -fsSL "${archive_url}" -o "${archive_path}"; then
+              break
+            fi
+            echo "Waiting for release archive (attempt ${attempt}/12)..."
+            sleep 10
+          done
+
+          test -s "${archive_path}"
+
+          {
+            echo "version=${version}"
+            echo "archive_url=${archive_url}"
+            echo "archive_sha256=$(sha256sum "${archive_path}" | awk '{ print $1 }')"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Update formula and publish to tap
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_AUTOMATION_TOKEN || github.token }}
+        run: |
+          version="${{ steps.formula.outputs.version }}"
+          archive_url="${{ steps.formula.outputs.archive_url }}"
+          archive_sha256="${{ steps.formula.outputs.archive_sha256 }}"
+          tap_repo="${{ github.repository_owner }}/homebrew-s3mirror"
+
+          tmpdir="$(mktemp -d)"
+          trap 'rm -rf "${tmpdir}"' EXIT
+
+          gh repo clone "${tap_repo}" "${tmpdir}/tap" -- --depth=1
+          cd "${tmpdir}/tap"
+
+          test -f Formula/s3mirror.rb
+          VERSION="${version}" ARCHIVE_URL="${archive_url}" ARCHIVE_SHA256="${archive_sha256}" perl -0pi -e '
+            s/version "[^"]+"/version "$ENV{VERSION}"/;
+            s#url "https://github.com/netspeedy/s3mirror/archive/[^"]+"#url "$ENV{ARCHIVE_URL}"#;
+            s/sha256 "[^"]+"/sha256 "$ENV{ARCHIVE_SHA256}"/;
+          ' Formula/s3mirror.rb
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/s3mirror.rb
+          git diff --cached --quiet && echo "No formula changes" && exit 0
+          git commit -m "chore: update formula for v${version}"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${tap_repo}.git"
+          git push

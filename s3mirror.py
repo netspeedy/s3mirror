@@ -31,6 +31,8 @@ import yaml
 from boto3.s3.transfer import TransferConfig
 from botocore.config import Config
 
+__version__ = "1.0.0"
+
 # ==========================================
 # DEFAULT CONFIGURATION
 # ==========================================
@@ -827,7 +829,7 @@ Examples:
     parser.add_argument(
         "--version",
         action="version",
-        version="S3 Mirror v1.0.0",
+        version=f"S3 Mirror v{__version__}",
     )
 
     return parser.parse_args()
