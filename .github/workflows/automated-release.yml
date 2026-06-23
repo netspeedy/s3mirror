@@ -1,0 +1,107 @@
+name: Automated Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: automated-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    name: Create Release Tag
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check release automation token
+        id: automation
+        env:
+          RELEASE_AUTOMATION_TOKEN: ${{ secrets.RELEASE_AUTOMATION_TOKEN }}
+        run: |
+          if [ -n "${RELEASE_AUTOMATION_TOKEN}" ]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          echo "enabled=false" >> "${GITHUB_OUTPUT}"
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "RELEASE_AUTOMATION_TOKEN is required to create release tags and trigger publish workflows." >&2
+            exit 1
+          fi
+
+          {
+            echo "Automated release tagging skipped."
+            echo
+            echo "Add a \`RELEASE_AUTOMATION_TOKEN\` repository secret with contents and workflows write access to enable stable tag creation."
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Checkout repository
+        if: steps.automation.outputs.enabled == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve app version
+        if: steps.automation.outputs.enabled == 'true'
+        id: version
+        run: |
+          version="$(python -c 'import ast; from pathlib import Path; tree = ast.parse(Path("s3mirror.py").read_text()); print(next(ast.literal_eval(node.value) for node in tree.body if isinstance(node, ast.Assign) for target in node.targets if isinstance(target, ast.Name) and target.id == "__version__"))')"
+
+          if ! printf '%s\n' "${version}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            printf 'invalid release version: %s\n' "${version}" >&2
+            exit 1
+          fi
+
+          {
+            echo "version=${version}"
+            echo "tag=v${version}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Fetch tags
+        if: steps.automation.outputs.enabled == 'true'
+        run: git fetch --tags --force
+
+      - name: Skip if release tag already exists
+        if: steps.automation.outputs.enabled == 'true'
+        id: existing
+        run: |
+          tag="${{ steps.version.outputs.tag }}"
+          if git show-ref --verify --quiet "refs/tags/${tag}"; then
+            echo "release_required=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "release_required=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Create and push stable tag
+        if: steps.existing.outputs.release_required == 'true'
+        env:
+          RELEASE_AUTOMATION_TOKEN: ${{ secrets.RELEASE_AUTOMATION_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          tag="${{ steps.version.outputs.tag }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${tag}" -m "Release ${tag}"
+          git push "https://x-access-token:${RELEASE_AUTOMATION_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "refs/tags/${tag}"
+
+      - name: Write workflow summary
+        if: steps.automation.outputs.enabled == 'true'
+        run: |
+          tag="${{ steps.version.outputs.tag }}"
+
+          if [ "${{ steps.existing.outputs.release_required }}" != "true" ]; then
+            printf 'Release tag `%s` already exists; no tag was created.\n' "${tag}" >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+
+          printf 'Created stable release tag `%s`.\n' "${tag}" >> "${GITHUB_STEP_SUMMARY}"
