@@ -15,3 +15,11 @@ updates:
       day: "monday"
       time: "03:15"
     open-pull-requests-limit: 5
+
+  - package-ecosystem: "npm"
+    directory: "/.github/assets/website"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:30"
+    open-pull-requests-limit: 5

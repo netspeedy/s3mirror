@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="s3mirror">
+  <defs>
+    <linearGradient id="bucket" x1="10" x2="54" y1="12" y2="54" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#29c7ff" />
+      <stop offset="0.5" stop-color="#9b73ff" />
+      <stop offset="1" stop-color="#ff9f43" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="12" fill="#0b1018" />
+  <path d="M14 18c0-4 8-7 18-7s18 3 18 7-8 7-18 7-18-3-18-7Z" fill="none" stroke="url(#bucket)" stroke-width="4" />
+  <path d="M14 18v20c0 4 8 7 18 7s18-3 18-7V18" fill="none" stroke="url(#bucket)" stroke-width="4" stroke-linecap="round" />
+  <path d="M22 32h19m0 0-6-6m6 6-6 6" fill="none" stroke="#f5f8fc" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

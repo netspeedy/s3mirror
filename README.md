@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/assets/logo.png" width="100%" alt="s3mirror">
+  <img src="assets/logo.png" width="100%" alt="s3mirror">
 </p>
 
 <p align="center">

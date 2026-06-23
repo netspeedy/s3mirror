@@ -1,0 +1,140 @@
+name: Deploy Pages Site
+
+on:
+  push:
+    branches:
+      - main
+  release:
+    types:
+      - published
+  workflow_run:
+    workflows:
+      - Automated Release
+      - Publish Homebrew Formula
+    types:
+      - completed
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-pages-site
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Pages Site
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    permissions:
+      contents: read
+      pages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v6
+        with:
+          enablement: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: .github/assets/website/package-lock.json
+
+      - name: Resolve latest release metadata
+        id: latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/latest" > latest-release.json 2>/dev/null; then
+            release_tag="$(jq -r '.tag_name' latest-release.json)"
+            git fetch --tags --force
+            release_commit="$(git rev-list -n 1 "${release_tag}" 2>/dev/null || true)"
+            {
+              echo "available=true"
+              echo "tag=${release_tag}"
+              echo "commit=${release_commit}"
+            } >> "${GITHUB_OUTPUT}"
+          else
+            {
+              echo "available=false"
+              echo "tag="
+              echo "commit="
+            } >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Build site payload
+        run: |
+          site_url="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          mkdir -p site
+          npm ci --prefix .github/assets/website
+          make website-check
+          make website-build
+          cp -a .github/assets/website/dist/. site/
+          touch site/.nojekyll
+
+          if [ "${{ steps.latest.outputs.available }}" = "true" ]; then
+            latest_release_json="$(jq \
+              --arg old_repo "https://github.com/soakes/${{ github.event.repository.name }}" \
+              --arg new_repo "https://github.com/${GITHUB_REPOSITORY}" \
+              --arg old_pages "https://soakes.github.io/${{ github.event.repository.name }}" \
+              --arg new_pages "${site_url%/}" \
+              'if .body then .body |= (gsub($old_repo; $new_repo) | gsub($old_pages; $new_pages)) else . end' \
+              latest-release.json)"
+          else
+            latest_release_json='null'
+          fi
+
+          jq -n \
+            --arg site_url "${site_url}" \
+            --arg github_repository "${GITHUB_REPOSITORY}" \
+            --arg github_url "https://github.com/${GITHUB_REPOSITORY}" \
+            --arg release_url "https://github.com/${GITHUB_REPOSITORY}/releases" \
+            --arg homebrew_url "https://github.com/${{ github.repository_owner }}/homebrew-${{ github.event.repository.name }}" \
+            --arg release_commit "${{ steps.latest.outputs.commit }}" \
+            --argjson latest_release "${latest_release_json}" \
+            '{
+              site_url: $site_url,
+              github_repository: $github_repository,
+              github_url: $github_url,
+              release_url: $release_url,
+              homebrew_url: $homebrew_url,
+              release_commit: $release_commit,
+              latest_release: $latest_release
+            }' > site/website-metadata.json
+
+          test -f site/index.html
+          test -f site/website-metadata.json
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    name: Deploy Pages Site
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      pages: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

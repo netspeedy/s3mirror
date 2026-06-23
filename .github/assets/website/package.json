@@ -1,0 +1,17 @@
+{
+  "name": "s3mirror-website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "node ./scripts/check.mjs"
+  },
+  "devDependencies": {
+    "vite": "6.4.3"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.2.8"
+  }
+}
