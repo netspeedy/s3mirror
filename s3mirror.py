@@ -31,7 +31,7 @@ import yaml
 from boto3.s3.transfer import TransferConfig
 from botocore.config import Config
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 # ==========================================
 # DEFAULT CONFIGURATION
