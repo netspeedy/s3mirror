@@ -109,7 +109,7 @@ jobs:
         if: steps.candidates.outputs.count != '0'
         env:
           DEFAULT_GH_TOKEN: ${{ github.token }}
-          DEPENDABOT_AUTOMERGE_TOKEN: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN }}
+          AUTOMATION_AUTOMERGE_TOKEN: ${{ secrets.AUTOMATION_AUTOMERGE_TOKEN || secrets.DEPENDABOT_AUTOMERGE_TOKEN }}
           GH_REPO: ${{ github.repository }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           CANDIDATE_PRS: ${{ steps.candidates.outputs.prs }}
@@ -118,7 +118,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          export GH_TOKEN="${DEPENDABOT_AUTOMERGE_TOKEN:-${DEFAULT_GH_TOKEN}}"
+          export GH_TOKEN="${AUTOMATION_AUTOMERGE_TOKEN:-${DEFAULT_GH_TOKEN}}"
 
           # shellcheck disable=SC2016
           pr_query='
@@ -289,10 +289,10 @@ jobs:
               printf '| [#%s](%s) | merged | %s |\n' "${pr_number}" "${url}" "$(escape_markdown "${detail}")" >> "${GITHUB_STEP_SUMMARY}"
             elif printf '%s' "${merge_output}" | grep -Fq 'without workflows permission'; then
               skipped=$((skipped + 1))
-              if [ -n "${DEPENDABOT_AUTOMERGE_TOKEN:-}" ]; then
+              if [ -n "${AUTOMATION_AUTOMERGE_TOKEN:-}" ]; then
                 detail="GitHub rejected the merge because the configured Dependabot merge token does not have enough workflow permissions for this PR."
               else
-                detail="This PR updates workflow files. Add a DEPENDABOT_AUTOMERGE_TOKEN secret with contents, pull requests, and workflows write access to automate this class of PR."
+                detail="This PR updates workflow files. Add an AUTOMATION_AUTOMERGE_TOKEN secret with contents, pull requests, and workflows write access to automate this class of PR."
               fi
               printf '| [#%s](%s) | skipped | %s |\n' "${pr_number}" "${url}" "$(escape_markdown "${detail}")" >> "${GITHUB_STEP_SUMMARY}"
             elif printf '%s' "${merge_output}" | grep -Fq "add the \`--auto\` flag"; then
