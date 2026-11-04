@@ -25,7 +25,7 @@ updates:
     open-pull-requests-limit: 5
 
   - package-ecosystem: "npm"
-    directory: "/.github/assets/website"
+    directory: "/website"
     schedule:
       interval: "weekly"
       day: "monday"

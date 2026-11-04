@@ -1,6 +1,6 @@
 .git
-.github/assets/website/node_modules
-.github/assets/website/dist
+website/node_modules
+website/dist
 .venv
 __pycache__
 *.pyc
