@@ -32,6 +32,3 @@ pnpm-debug.log*
 
 # Logs
 *.log
-
-# Cached by scripts/readme/measure_headline.py
-scripts/readme/inter-latin.ttf
