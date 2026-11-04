@@ -1,141 +1,159 @@
 <p align="center">
-  <img src="assets/logo.png" width="100%" alt="s3mirror">
-</p>
-
-<p align="center">
-  Mirror buckets and objects between S3-compatible endpoints — one script, one config, clear logs.
+  <img src="assets/s3mirror-readme-hero.svg" width="960" alt="s3mirror - no vendor lock-in, copy what changed. Buckets and objects between S3-compatible endpoints, one config, clear logs.">
 </p>
 
 <p align="center">
   <a href="https://github.com/netspeedy/s3mirror/actions/workflows/lint.yml"><img src="https://img.shields.io/github/actions/workflow/status/netspeedy/s3mirror/lint.yml?branch=main&style=flat-square&label=lint" alt="Lint"></a>
-  <a href="https://github.com/netspeedy/s3mirror/actions/workflows/format.yml"><img src="https://img.shields.io/github/actions/workflow/status/netspeedy/s3mirror/format.yml?branch=main&style=flat-square&label=format" alt="Format"></a>
   <a href="https://github.com/netspeedy/s3mirror/actions/workflows/container-image.yml"><img src="https://img.shields.io/github/actions/workflow/status/netspeedy/s3mirror/container-image.yml?style=flat-square&label=container" alt="Container"></a>
-  <a href="https://github.com/netspeedy/s3mirror/pkgs/container/s3mirror"><img src="https://img.shields.io/badge/GHCR-s3mirror-38d99f.svg?style=flat-square&logo=github" alt="GHCR package"></a>
-  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB.svg?style=flat-square&logo=python&logoColor=white" alt="Python"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-2EA043.svg?style=flat-square" alt="License"></a>
-  <a href="https://github.com/netspeedy/s3mirror/issues"><img src="https://img.shields.io/github/issues/netspeedy/s3mirror?style=flat-square" alt="Issues"></a>
+  <a href="https://github.com/netspeedy/s3mirror/releases"><img src="https://img.shields.io/github/v/release/netspeedy/s3mirror?sort=semver&style=flat-square" alt="Release"></a>
+  <a href="https://github.com/netspeedy/homebrew-s3mirror"><img src="https://img.shields.io/badge/Homebrew-tap-FBB040?style=flat-square&logo=homebrew&logoColor=black" alt="Homebrew tap"></a>
+  <a href="https://github.com/netspeedy/s3mirror/pkgs/container/s3mirror"><img src="https://img.shields.io/badge/GHCR-published-2088FF?style=flat-square&logo=github" alt="GHCR"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-2EA043?style=flat-square" alt="License"></a>
 </p>
 
 ---
 
-**s3mirror** copies buckets and objects from one S3-compatible endpoint to
-another. It is intentionally direct: one script, one config file, and clear logs
-that are usable from an interactive shell, cron, systemd timers, or CI jobs.
+s3mirror copies buckets and objects from one S3-compatible endpoint to another:
+AWS S3, MinIO, Ceph, Wasabi, Backblaze B2 or anything else that speaks the S3 API.
+It finds every source bucket, creates any that are missing at the destination, and
+copies objects that are new or whose size has changed. It can also remove objects
+that exist only at the destination, so the destination ends up a true mirror.
 
-Built for operators who need a small, inspectable, automation-friendly mirror
-tool for AWS S3, MinIO, Ceph, Wasabi, Backblaze B2, and other S3-compatible
-storage systems.
+It's one Python script with one config file, built on `boto3` so what it does is
+easy to read and audit. It started as an alternative to vendor-specific mirror
+tooling. Its logs work for a person at a terminal and for cron, systemd timers or
+CI, and the exit code tells a scheduler whether the run went cleanly.
 
-**Quick links:** [Quick Start](#quick-start) · [Container Image](#container-image) · [Configuration](#configuration) · [How It Works](#how-it-works) · [Usage](#usage) · [Safety Notes](#safety-notes) · [CI/CD](#cicd)
+**Quick links:** [Install](#install) · [Try it](#try-it) · [Configuration](#configuration) · [Safety](#safety) · [Container image](#container-image) · [Releases](https://github.com/netspeedy/s3mirror/releases) · [Website](https://netspeedy.github.io/s3mirror/)
 
----
+## Install
 
-## Overview
+On macOS or Linux, Homebrew is the easiest route:
 
-`s3mirror` copies buckets and objects from one S3-compatible endpoint to another.
-It is intentionally direct: one script, one config file, and clear logs that are
-usable from an interactive shell, cron, systemd timers, or CI jobs.
-
-In normal operation it does five things:
-
-- loads YAML or JSON configuration
-- verifies source and destination S3 connectivity
-- discovers source buckets, excluding any configured bucket names
-- creates missing destination buckets
-- copies new or size-changed objects and optionally deletes destination-only objects
-
-The project was created as an independent alternative to relying on vendor
-specific mirror tooling. It uses `boto3`, so the behavior is easy to audit and
-the same workflow can be pointed at most S3-compatible services.
-
-### First Run Checklist
-
-1. Create a dedicated source credential with read access to the buckets you want mirrored.
-2. Create a dedicated destination credential with bucket creation, upload, list, and delete permissions as needed.
-3. Start with `delete_extraneous: false` or use `--no-delete` for the first validation run.
-4. Run with `--debug` once to confirm bucket discovery, object counts, and transfer decisions.
-5. Enable deletion only after the copy-only behavior looks correct.
-6. For scheduled runs, use `--log-file` and alert on non-zero exit codes.
-
----
-
-## Capabilities
-
-- **S3-compatible endpoints**: works with AWS S3 and S3-compatible APIs such as MinIO, Ceph, Wasabi, and Backblaze B2.
-- **Whole-bucket mirroring**: discovers source buckets and mirrors each one to the destination.
-- **Destination bootstrap**: creates missing destination buckets before copying objects.
-- **Parallel transfers**: uses a configurable thread pool for copy and delete operations.
-- **Multipart uploads**: uses `boto3` transfer configuration for larger object uploads.
-- **Optional true mirror mode**: removes destination-only objects when deletion is enabled.
-- **Bucket exclusions**: skips configured buckets that should not be mirrored.
-- **YAML or JSON config**: keeps endpoint credentials, performance tuning, and sync behavior in one file.
-- **CLI overrides**: lets operators override worker count and deletion behavior at runtime.
-- **Automation-friendly logging**: supports normal, quiet, debug, and file logging modes.
-- **CI validation**: checks formatting and linting across supported Python versions.
-
----
-
-## How It Works
-
-At runtime, `s3mirror` follows a simple reconciliation loop over every source
-bucket:
-
-```mermaid
-flowchart TD
-    A[Load YAML or JSON config] --> B[Apply CLI overrides]
-    B --> C[Create source and destination S3 clients]
-    C --> D[Verify both endpoints with ListBuckets]
-    D --> E[Discover source buckets]
-    E --> F[Remove configured excluded buckets]
-    F --> G[Process each bucket]
-    G --> H{Destination bucket exists?}
-    H -- No --> I[Create destination bucket]
-    H -- Yes --> J[List source and destination objects]
-    I --> J
-    J --> K[Compare object keys and sizes]
-    K --> L[Copy new or size-changed objects]
-    K --> M{Deletion enabled?}
-    M -- Yes --> N[Delete destination-only objects]
-    M -- No --> O[Leave destination-only objects in place]
-    L --> P[Print final summary and exit code]
-    N --> P
-    O --> P
+```bash
+brew tap netspeedy/s3mirror
+brew install s3mirror
 ```
 
-The deployment shape is deliberately small:
+> On recent Homebrew, new third-party taps require explicit trust. If installation is refused, run `brew trust netspeedy/s3mirror` once, then `brew install s3mirror`.
 
-```mermaid
-flowchart LR
-    subgraph Operator["Operator or scheduler"]
-        CFG[config.yaml or config.json]
-        CLI[CLI flags]
-        LOG[console or log file]
-    end
+The container image is published to GHCR for `linux/amd64` and `linux/arm64`:
 
-    subgraph Source["Source S3-compatible endpoint"]
-        SB[(source buckets)]
-    end
-
-    subgraph Mirror["s3mirror.py"]
-        V[verify connections]
-        D[diff keys and sizes]
-        T[parallel transfer workers]
-    end
-
-    subgraph Destination["Destination S3-compatible endpoint"]
-        DB[(destination buckets)]
-    end
-
-    CFG --> Mirror
-    CLI --> Mirror
-    SB --> V
-    V --> D
-    D --> T
-    T --> DB
-    Mirror --> LOG
+```bash
+docker pull ghcr.io/netspeedy/s3mirror:latest
 ```
 
-Object decisions are based on object key presence and byte size:
+Or run it from a checkout. It needs Python 3.11 or newer, and its only
+dependencies are `boto3`, `urllib3` and `PyYAML`:
+
+```bash
+git clone https://github.com/netspeedy/s3mirror.git
+cd s3mirror
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+```
+
+From a checkout the command is `python3 s3mirror.py` rather than `s3mirror`.
+
+## Try it
+
+Put both endpoints in a config file. Anything you leave out takes its default, so
+this is enough to start:
+
+```yaml
+source:
+  endpoint_url: "https://s3.source.example.com"
+  aws_access_key_id: "SOURCE_ACCESS_KEY"
+  aws_secret_access_key: "SOURCE_SECRET_KEY"
+
+destination:
+  endpoint_url: "https://s3.destination.example.com"
+  aws_access_key_id: "DEST_ACCESS_KEY"
+  aws_secret_access_key: "DEST_SECRET_KEY"
+```
+
+Make the first run copy-only, so nothing at the destination is deleted:
+
+```bash
+s3mirror --config config.yaml --no-delete
+```
+
+This run was against two local test endpoints. The destination already had
+`app-data` with one matching object, one older copy of `config/settings.json` and a
+stray `exports/old-report.csv`:
+
+```text
+======================================================================
+S3 BUCKET MIRROR
+Session started: 2026-11-04 02:39:49
+======================================================================
+✓ Source connected successfully (2 buckets)
+✓ Destination connected successfully (1 buckets)
+
+Starting synchronization of 2 bucket(s)
+Performance: 20 workers, 8.0MB multipart threshold
+
+======================================================================
+[1/2]: app-data
+======================================================================
+  Source: 4 objects
+  Destination: 3 objects
+  Actions: 3 to copy (100.8KB), 0 to delete
+  ✓ Copied 3 objects in 0.0s (9.9MB/s)
+  ✓ Bucket completed in 0.0s
+
+======================================================================
+[2/2]: media-assets
+======================================================================
+  ✓ Created bucket: media-assets
+  Source: 2 objects
+  Destination: 0 objects
+  Actions: 2 to copy (742.2KB), 0 to delete
+  ✓ Copied 2 objects in 0.0s (112.1MB/s)
+  ✓ Bucket completed in 0.0s
+
+======================================================================
+FINAL SUMMARY
+======================================================================
+Started:  2026-11-04 02:39:49
+Finished: 2026-11-04 02:39:49
+Duration: 0.1s (0s)
+
+Buckets:
+  - Processed: 2
+  - Created:   1
+
+Objects:
+  - Copied:    5
+  - Deleted:   0
+
+Data transferred: 843.0KB
+Average throughput: 14.7MB/s
+
+✓ Status: COMPLETED SUCCESSFULLY
+======================================================================
+```
+
+The two new exports and the changed `settings.json` were copied, the matching
+export was skipped, and `media-assets` was created and filled. Run it again
+without `--no-delete` and the stray `old-report.csv` is removed as well, because
+deleting destination-only objects is on by default. Add `--debug` to see every
+decision. `--show-config` prints the configuration s3mirror will actually use,
+with the secret keys redacted.
+
+Before a real first run:
+
+1. Give s3mirror its own source credential, with read access to the buckets you want mirrored.
+2. Give it its own destination credential that can list, create buckets and upload, plus delete if you'll allow deletion.
+3. Run with `--no-delete` and `--debug` once, and check the bucket list, object counts and actions.
+4. Only then let it delete, and for scheduled runs use `--log-file` and alert on a non-zero exit code.
+
+## How it decides
+
+For each source bucket it lists the objects on both sides with `list_objects_v2`
+and compares them by key and size:
 
 ```mermaid
 flowchart TD
@@ -149,42 +167,20 @@ flowchart TD
     G -- No --> I[Keep on destination]
 ```
 
-Important detail: this tool currently compares keys and sizes, not object
-checksums or metadata. If two objects have the same key and size but different
-content, `s3mirror` will treat them as already synchronized.
+It doesn't compare checksums, ETags, metadata, tags, storage class, ACLs,
+retention settings or version history. That keeps it fast, but two objects with the
+same key and size count as in sync even if their contents differ, metadata-only
+changes aren't mirrored, and versioned history isn't replayed. Bucket policies and
+lifecycle rules at the destination are left alone.
 
----
+Copies stream from `get_object` into `upload_fileobj`, which switches to multipart
+uploads above the configured threshold. Requests use path-style addressing and
+botocore's adaptive retries, with up to three attempts.
 
-## Prerequisites
+## Configuration
 
-- Python `3.11+`
-- Network access to both S3-compatible endpoints
-- Source credentials with permission to list buckets and read objects
-- Destination credentials with permission to list buckets, create buckets, upload objects, and delete objects if mirror deletion is enabled
-- `pip` for installing Python dependencies
-- Docker or another OCI-compatible runtime if using the published container image
-
-Runtime dependencies are listed in [`requirements.txt`](requirements.txt):
-
-- `boto3`
-- `urllib3`
-- `PyYAML`
-
----
-
-## Quick Start
-
-Clone the repository and create a virtual environment:
-
-```bash
-git clone https://github.com/netspeedy/s3mirror.git
-cd s3mirror
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-Create a configuration file:
+The config file is YAML or JSON with four sections: `source`, `destination`,
+`performance` and `sync`. This one sets every key:
 
 ```yaml
 source:
@@ -210,35 +206,80 @@ performance:
 
 sync:
   delete_extraneous: false
-  exclude_buckets: []
+  exclude_buckets:
+    - scratch-bucket
+    - temporary-exports
 ```
 
-Run a copy-only validation pass:
+`source` and `destination` take the same keys:
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `endpoint_url` | none | S3-compatible API endpoint URL. |
+| `aws_access_key_id` | none | Access key for the endpoint. |
+| `aws_secret_access_key` | none | Secret key for the endpoint. |
+| `region_name` | `us-east-1` | Region passed to `boto3`. Many non-AWS services still expect one. |
+| `verify_ssl` | `false` | TLS certificate verification. Set it to `true` unless the endpoint really uses a self-signed certificate on a network you trust. |
+
+`performance` tunes transfers:
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `max_workers` | `20` | Worker threads for copies and deletes. |
+| `multipart_threshold` | `8388608` | Object size in bytes at which uploads become multipart. |
+| `multipart_chunksize` | `8388608` | Multipart chunk size in bytes. |
+| `max_concurrency` | `10` | Per-transfer concurrency in the `boto3` transfer config. |
+| `max_pool_connections` | `50` | HTTP connection pool size for each S3 client. |
+
+`sync` controls what gets mirrored:
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `delete_extraneous` | `true` | Delete destination objects that don't exist in the source. |
+| `exclude_buckets` | `[]` | Source bucket names to skip entirely. |
+
+## Command-line flags
+
+Flags override the config for a single run.
+
+| Flag | Description |
+|------|-------------|
+| `-c`, `--config FILE` | Config file, `.yaml` or `.json`. |
+| `-w`, `--workers N` | Override `max_workers`. |
+| `--no-delete` | Don't delete destination-only objects, whatever `delete_extraneous` says. |
+| `-q`, `--quiet` | Errors only on the console. |
+| `-d`, `--debug` | Verbose output, including every transfer decision. |
+| `-l`, `--log-file FILE` | Write a full debug log to a file. The console stays quiet unless `--debug` is also set. |
+| `--show-config` | Print the effective configuration with secret keys redacted, then exit. |
+| `--version` | Print the version and exit. |
+
+## Running it on a schedule
+
+For cron or a systemd timer, log to a file and keep the console quiet:
 
 ```bash
-python3 s3mirror.py --config config.yaml --no-delete --debug
+s3mirror --config /etc/s3mirror.yaml --log-file /var/log/s3mirror.log --quiet
 ```
 
-When the output looks correct, run with the deletion behavior from the config:
+Each run starts the log file with a session header, so it can be tailed or rotated
+by other tools. s3mirror exits `0` when the run finishes without errors and `1`
+otherwise, including a bad config or an endpoint it can't reach, so alert on the
+exit code. The final summary reports buckets processed and created, objects
+copied and deleted, data transferred, average throughput and the error count.
 
-```bash
-python3 s3mirror.py --config config.yaml --log-file /var/log/s3mirror.log
-```
+| Mode | Console | Log file | Typical use |
+|------|---------|----------|-------------|
+| Normal | Progress and summary | None | Interactive runs |
+| `--debug` | Every decision, with levels | None | Troubleshooting |
+| `--quiet` | Errors only | None | Minimal cron output |
+| `--log-file` | Errors only, unless `--debug` is set | Full debug log with timestamps | Production automation |
 
----
+## Container image
 
-## Container Image
-
-Stable releases are published to GitHub Container Registry as
-[`ghcr.io/netspeedy/s3mirror`](https://github.com/netspeedy/s3mirror/pkgs/container/s3mirror).
-
-Pull the latest stable image:
-
-```bash
-docker pull ghcr.io/netspeedy/s3mirror:latest
-```
-
-Run a copy-only validation pass with a mounted config file:
+Stable releases are published to
+[`ghcr.io/netspeedy/s3mirror`](https://github.com/netspeedy/s3mirror/pkgs/container/s3mirror)
+with the tags `latest`, the version (`1.0.3`), the minor version (`1.0`) and the Git
+tag (`v1.0.3`). Mount the config and pass the same flags:
 
 ```bash
 docker run --rm \
@@ -247,396 +288,80 @@ docker run --rm \
   --config /config/config.yaml --no-delete --debug
 ```
 
-Pin a specific release for scheduled jobs:
+For scheduled jobs, pin a version and mount somewhere for the log:
 
 ```bash
 docker run --rm \
   -v /etc/s3mirror.yaml:/config/config.yaml:ro \
   -v /var/log/s3mirror:/logs \
   ghcr.io/netspeedy/s3mirror:1.0.3 \
-  --config /config/config.yaml \
-  --log-file /logs/s3mirror.log \
-  --quiet
+  --config /config/config.yaml --log-file /logs/s3mirror.log --quiet
 ```
 
-Published image tags include `latest`, the full semantic version such as
-`1.0.3`, the major/minor tag such as `1.0`, and the Git tag form such as
-`v1.0.3`.
-
----
-
-## Configuration
-
-`s3mirror` accepts YAML and JSON configuration files. The top-level sections are:
-
-- `source`: connection settings for the source S3 endpoint
-- `destination`: connection settings for the destination S3 endpoint
-- `performance`: transfer and HTTP pool tuning
-- `sync`: mirror behavior
-
-### Example Configuration
-
-```yaml
-source:
-  endpoint_url: "https://s3.source.example.com"
-  aws_access_key_id: "SOURCE_ACCESS_KEY"
-  aws_secret_access_key: "SOURCE_SECRET_KEY"
-  region_name: "us-east-1"
-  verify_ssl: true
-
-destination:
-  endpoint_url: "https://s3.destination.example.com"
-  aws_access_key_id: "DEST_ACCESS_KEY"
-  aws_secret_access_key: "DEST_SECRET_KEY"
-  region_name: "us-east-1"
-  verify_ssl: true
-
-performance:
-  max_workers: 20
-  multipart_threshold: 8388608
-  multipart_chunksize: 8388608
-  max_concurrency: 10
-  max_pool_connections: 50
-
-sync:
-  delete_extraneous: true
-  exclude_buckets:
-    - scratch-bucket
-    - temporary-exports
-```
-
-### Source and Destination
-
-| Key | Description |
-|-----|-------------|
-| `endpoint_url` | S3-compatible API endpoint URL. |
-| `aws_access_key_id` | Access key for the endpoint. |
-| `aws_secret_access_key` | Secret key for the endpoint. |
-| `region_name` | Region name passed to `boto3`. Many non-AWS services still expect a value. |
-| `verify_ssl` | Enables or disables TLS certificate verification. Use `false` only for trusted self-signed environments. |
-
-### Performance
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `max_workers` | `20` | Number of worker threads used for object copy and delete operations. |
-| `multipart_threshold` | `8388608` | Object size in bytes where multipart upload behavior starts. |
-| `multipart_chunksize` | `8388608` | Multipart chunk size in bytes. |
-| `max_concurrency` | `10` | Per-transfer concurrency passed to `boto3` transfer config. |
-| `max_pool_connections` | `50` | HTTP connection pool size for each S3 client. |
-
-### Sync
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `delete_extraneous` | `true` | Deletes destination objects that do not exist in the source. |
-| `exclude_buckets` | `[]` | Source bucket names to skip entirely. |
-
-`--workers` and `--no-delete` override the loaded configuration for a single
-run. Use `--show-config` to inspect the effective configuration with secret keys
-redacted.
-
-```bash
-python3 s3mirror.py --config config.yaml --show-config
-```
-
----
-
-## Usage
-
-### Basic Run
-
-```bash
-python3 s3mirror.py --config config.yaml
-```
-
-### Command-Line Flags
-
-```text
--c, --config FILE
-    Configuration file path (.json or .yaml)
-
--q, --quiet
-    Quiet mode. Console shows errors only.
-
--d, --debug
-    Enable verbose debug output.
-
--l, --log-file FILE
-    Write full debug logs to a file. Console stays quiet unless --debug is used.
-
--w, --workers N
-    Override the configured parallel worker count.
-
---no-delete
-    Do not delete destination-only objects, even if delete_extraneous is true.
-
---show-config
-    Display the effective configuration with secret keys redacted and exit.
-
---version
-    Print version information and exit.
-```
-
-### Examples
-
-Run with a custom worker count:
-
-```bash
-python3 s3mirror.py --config config.yaml --workers 40
-```
-
-Run safely without destination deletion:
-
-```bash
-python3 s3mirror.py --config config.yaml --no-delete
-```
-
-Run with detailed troubleshooting output:
-
-```bash
-python3 s3mirror.py --config config.yaml --debug
-```
-
-Run from cron with file logging:
-
-```cron
-0 2 * * * /path/to/s3mirror/.venv/bin/python /path/to/s3mirror/s3mirror.py --config /path/to/config.yaml --log-file /var/log/s3mirror.log --quiet
-```
-
-Run from a systemd timer or service by invoking the same Python command and
-using the process exit code for alerting.
-
----
-
-## Operational Behavior
-
-| Area | Behavior |
-|------|----------|
-| Endpoint verification | Calls `ListBuckets` against both source and destination before syncing. |
-| Bucket discovery | Mirrors source buckets except names listed in `exclude_buckets`. |
-| Bucket creation | Creates missing destination buckets with the same bucket name. |
-| Object listing | Uses `list_objects_v2` pagination for source and destination buckets. |
-| Object comparison | Copies objects that are missing or whose byte size differs. |
-| Transfers | Streams from source with `get_object` and uploads to destination with `upload_fileobj`. |
-| Deletes | Deletes destination-only keys only when deletion is enabled. |
-| Retries | Uses botocore adaptive retries with `max_attempts` set to `3`. |
-| Addressing | Uses S3 path-style addressing. |
-| Exit code | Exits `0` when the run completes without counted errors, otherwise exits `1`. |
-
-Statistics printed at the end include buckets processed, buckets created,
-objects copied, objects deleted, data transferred, average throughput, and error
-count.
-
----
-
-## Logging
-
-`s3mirror` has logging modes for both humans and schedulers:
-
-| Mode | Console Output | File Output | Typical Use |
-|------|----------------|-------------|-------------|
-| Normal | Progress and summary | None | Interactive runs |
-| Debug | Verbose details with levels | None | Troubleshooting |
-| Quiet | Errors only | None | Minimal cron output |
-| File log | Errors only unless `--debug` is set | Full debug log with timestamps | Production automation |
-
-Recommended scheduled form:
-
-```bash
-python3 s3mirror.py \
-  --config /etc/s3mirror.yaml \
-  --log-file /var/log/s3mirror.log \
-  --quiet
-```
-
-When a log file is configured, each run starts with a clear session header so
-the file can be tailed or rotated by external tooling.
-
----
-
-## Safety Notes
-
-`s3mirror` can delete data from the destination. Treat deletion as an operational
-choice, not a default assumption.
-
-### Deletion Behavior
-
-When `delete_extraneous: true`, destination objects that are not present in the
-source are deleted. This is useful for true mirror workflows, but it can remove
-objects that were intentionally written directly to the destination.
-
-Disable deletion for a run:
-
-```bash
-python3 s3mirror.py --config config.yaml --no-delete
-```
-
-Disable deletion in config:
-
-```yaml
-sync:
-  delete_extraneous: false
-```
-
-### Change Detection
-
-The current implementation compares object key and byte size. It does not
-compare checksums, ETags, object metadata, tags, storage class, ACLs, retention
-settings, or version history.
-
-That makes the tool fast and simple, but it also means:
-
-- same-key, same-size objects are treated as equal
-- metadata-only changes are not mirrored
-- versioned bucket history is not replayed
-- destination bucket policy and lifecycle settings are not managed
-
-### Recommended Guardrails
-
-- Start with `--no-delete` until the object counts look right.
-- Use dedicated credentials with only the permissions needed for the workflow.
-- Exclude buckets that are temporary, test-only, or destination-specific.
-- Keep independent backups for critical data before enabling deletion.
-- Alert on non-zero exit codes and review the log file regularly.
-- Test new endpoints or credential changes in a non-production bucket first.
-
----
-
-## CI/CD
-
-GitHub Actions keeps the small codebase checked across supported Python
-versions.
-
-### Workflows
-
-- `Lint`
-  - runs on pull requests and manual dispatch
-  - tests Python `3.11`, `3.12`, `3.13`, and `3.14`
-  - installs runtime and lint dependencies
-  - runs `pylint`, `black --check`, and `isort --check-only`
-  - builds the container image and checks `s3mirror --version`
-- `Auto-format`
-  - runs on pushes to `main` and `master`
-  - installs Black and isort in CI
-  - formats `s3mirror.py` with Black and isort
-  - commits formatting changes back when needed
-- `Container Image`
-  - runs on stable release tags and manual dispatch
-  - verifies the tag points to `main` and matches `s3mirror.py --version`
-  - publishes multi-architecture `linux/amd64` and `linux/arm64` images to GHCR
-- `Dependabot`
-  - checks Python dependencies, Docker base images, GitHub Actions, and website packages weekly
-  - limits open update pull requests per ecosystem
-
-### Local Maintainer Commands
+## Safety
+
+s3mirror can delete data from the destination, and with the default config it
+will. With `delete_extraneous: true`, anything at the destination that isn't in the
+source is removed, including objects someone wrote straight to the destination on
+purpose. Use `--no-delete` for a single run, or set `delete_extraneous: false` to
+turn it off for good.
+
+Give it credentials that can only do what the mirror needs. Exclude buckets that
+are temporary, test-only or belong only to the destination. Keep independent
+backups of anything critical before you enable deletion. Try new endpoints and
+credential changes against a non-production bucket first.
+
+## Troubleshooting
+
+If connecting fails, run with `--debug` and check the endpoint URL and scheme, the
+keys, the region the provider expects, `verify_ssl`, and whether firewalls, DNS or
+proxies let the machine reach both endpoints. If destination buckets aren't
+created, the destination credential probably can't create buckets, or the provider
+wants them created in a particular region or ahead of time.
+
+If an object isn't copied again, its key and size match, so s3mirror considers it
+in sync. Delete or rename the destination copy to force a copy. If cron output is
+too noisy, use `--quiet` with `--log-file`. s3mirror suppresses `urllib3`'s
+insecure-certificate warnings when `verify_ssl` is `false` so the logs stay
+readable, but the TLS risk is still there.
+
+## Development
+
+Install the runtime and lint dependencies, then run the same checks CI runs on
+every pull request:
 
 ```bash
 python3 -m pip install -r requirements.txt
 python3 -m pip install black isort pylint
-black s3mirror.py
-isort s3mirror.py
+black --check s3mirror.py
+isort --check-only s3mirror.py
 pylint s3mirror.py
 make container-smoke
 ```
 
----
+The Lint workflow runs pylint, black and isort on Python 3.11 to 3.14, builds the
+container, and builds the website. Pushes to `main` are formatted with black and
+isort automatically. Container Image publishes the multi-arch image when a stable
+tag is pushed, after checking that the tag is on `main` and matches
+`s3mirror.py --version`. Dependabot checks the Python packages, the Docker base
+image, the Actions and the website weekly, and green Dependabot pull requests are
+merged automatically.
 
-## Project Structure
+The banner at the top of this page is generated. Edit the copy, layout or timing in
+`scripts/readme/build_readme_hero.py` and run `make readme-hero` to rebuild
+`assets/s3mirror-readme-hero.svg`. It downloads the font subsets from Google Fonts,
+so it needs network access. If you change the headline's words, measure them again
+with `scripts/readme/measure_headline.py`, which explains its own dependencies.
 
-```text
-s3mirror/
-├── .github/
-│   ├── dependabot.yml
-│   └── workflows/
-│       ├── automated-release.yml
-│       ├── container-image.yml
-│       ├── dependabot-merge.yml
-│       ├── deploy-pages-site.yml
-│       ├── format.yml
-│       ├── lint.yml
-│       └── publish-homebrew-formula.yml
-├── .dockerignore
-├── .pylintrc
-├── Dockerfile
-├── LICENSE
-├── Makefile
-├── README.md
-├── assets/
-│   └── logo.png
-├── requirements.txt
-├── s3mirror.py
-└── website/
-```
-
-The repository keeps runtime behavior in [`s3mirror.py`](s3mirror.py), dependency
-pins in [`requirements.txt`](requirements.txt), the container image in
-[`Dockerfile`](Dockerfile), the website under
-[`website/`](website/), the README logo under
-[`assets/`](assets/), and CI policy under [`.github/`](.github/).
-
----
-
-## Troubleshooting
-
-### Connection Verification Fails
-
-Run with `--debug` and check:
-
-- endpoint URL and scheme
-- access key and secret key
-- region name required by the provider
-- TLS behavior through `verify_ssl`
-- firewall, DNS, or proxy access between the runner and both endpoints
-
-### Destination Buckets Are Not Created
-
-Confirm the destination credential can create buckets. Some providers also
-require region-specific bucket creation behavior or pre-created buckets in
-restricted accounts.
-
-### Objects Are Not Re-copied
-
-If the key and byte size match, `s3mirror` treats the object as synchronized.
-Rename the destination key, delete it, or change the source size if you need to
-force a copy with the current implementation.
-
-### Cron Produces Too Much Output
-
-Use `--quiet` with `--log-file`:
-
-```bash
-python3 s3mirror.py --config /etc/s3mirror.yaml --log-file /var/log/s3mirror.log --quiet
-```
-
-### Self-Signed Endpoint Certificates
-
-Set `verify_ssl: false` only when the endpoint and network are trusted. The
-script suppresses `urllib3` insecure certificate warnings so logs stay readable,
-but the TLS risk still exists.
-
----
-
-## Contributing
-
-Contributions are welcome. Useful areas include:
-
-- checksum-aware change detection
-- metadata, ACL, tag, or storage class mirroring
-- richer test coverage with mocked S3 endpoints
-- provider-specific compatibility notes
-- packaging and deployment examples
-- documentation improvements
-
-Before opening a pull request:
-
-1. Create a focused branch for the change.
-2. Run Black, isort, and pylint locally.
-3. Include enough detail in the pull request for another operator to understand the behavior change.
-4. Call out any safety, deletion, or compatibility impact.
-
----
+Contributions are welcome. Checksum-aware change detection, mirroring metadata,
+tags or storage class, tests against mocked S3 endpoints and notes on particular
+providers would all be useful. Keep pull requests focused, run the checks above,
+and say plainly if a change affects deletion, safety or compatibility.
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+Copyright © 2026 [Simon Oakes](https://github.com/soakes). Released under the
+[MIT License](LICENSE).
+
+`s3mirror` is an independent community tool and is not affiliated with, endorsed
+by, or sponsored by AWS or any of the storage providers it works with.

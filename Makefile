@@ -1,7 +1,7 @@
 WEBSITE_DIR ?= website
 IMAGE ?= s3mirror:local
 
-.PHONY: container-build container-smoke website-install website-check website-build website-dev
+.PHONY: container-build container-smoke website-install website-check website-build website-dev readme-hero
 
 container-build:
 	docker build --pull --tag $(IMAGE) .
@@ -23,3 +23,6 @@ website-build:
 website-dev:
 	test -d $(WEBSITE_DIR)/node_modules || (printf 'missing website dependencies; run `make website-install`\n' >&2 && exit 1)
 	npm --prefix $(WEBSITE_DIR) run dev
+
+readme-hero:
+	python3 scripts/readme/build_readme_hero.py
