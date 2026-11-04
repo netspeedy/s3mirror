@@ -1,4 +1,4 @@
-WEBSITE_DIR ?= .github/assets/website
+WEBSITE_DIR ?= website
 IMAGE ?= s3mirror:local
 
 .PHONY: container-build container-smoke website-install website-check website-build website-dev

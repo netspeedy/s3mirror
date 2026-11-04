@@ -43,7 +43,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: .github/assets/website/package-lock.json
+          cache-dependency-path: website/package-lock.json
 
       - name: Resolve latest release metadata
         id: latest
@@ -71,10 +71,10 @@ jobs:
         run: |
           site_url="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
           mkdir -p site
-          npm ci --prefix .github/assets/website
+          npm ci --prefix website
           make website-check
           make website-build
-          cp -a .github/assets/website/dist/. site/
+          cp -a website/dist/. site/
           touch site/.nojekyll
 
           if [ "${{ steps.latest.outputs.available }}" = "true" ]; then

@@ -10,10 +10,10 @@ htmlcov/
 venv/
 
 # Website / Node
-.github/assets/website/node_modules/
-.github/assets/website/dist/
-.github/assets/website/.vite/
-.github/assets/website/.captures/
+website/node_modules/
+website/dist/
+website/.vite/
+website/.captures/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

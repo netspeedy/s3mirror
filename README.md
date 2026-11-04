@@ -547,8 +547,6 @@ make container-smoke
 ```text
 s3mirror/
 ├── .github/
-│   ├── assets/
-│   │   └── website/
 │   ├── dependabot.yml
 │   └── workflows/
 │       ├── automated-release.yml
@@ -567,13 +565,14 @@ s3mirror/
 ├── assets/
 │   └── logo.png
 ├── requirements.txt
-└── s3mirror.py
+├── s3mirror.py
+└── website/
 ```
 
 The repository keeps runtime behavior in [`s3mirror.py`](s3mirror.py), dependency
 pins in [`requirements.txt`](requirements.txt), the container image in
 [`Dockerfile`](Dockerfile), the website under
-[`.github/assets/website/`](.github/assets/website/), the README logo under
+[`website/`](website/), the README logo under
 [`assets/`](assets/), and CI policy under [`.github/`](.github/).
 
 ---
