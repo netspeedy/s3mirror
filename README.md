@@ -347,11 +347,15 @@ tag is pushed, after checking that the tag is on `main` and matches
 image, the Actions and the website weekly, and green Dependabot pull requests are
 merged automatically.
 
-The banner at the top of this page is generated. Edit the copy, layout or timing in
-`scripts/readme/build_readme_hero.py` and run `make readme-hero` to rebuild
-`assets/s3mirror-readme-hero.svg`. It downloads the font subsets from Google Fonts,
-so it needs network access. If you change the headline's words, measure them again
-with `scripts/readme/measure_headline.py`, which explains its own dependencies.
+The banner at the top of this page and the social cards are generated. Edit the
+copy, layout or timing in `scripts/readme/build_readme_hero.py` and run `make
+readme-hero`. That rebuilds `assets/s3mirror-readme-hero.svg`, the website's
+`website/public/og-image.png` and `assets/s3mirror-social-preview.png`, which is the
+image for GitHub's social preview and is uploaded by hand in the repository
+settings. It downloads the font subsets from Google Fonts, so it needs network
+access, and it renders the cards with headless Chrome or Chromium. If you change the
+headline's words, measure them again with `scripts/readme/measure_headline.py`,
+which explains its own dependencies.
 
 Contributions are welcome. Checksum-aware change detection, mirroring metadata,
 tags or storage class, tests against mocked S3 endpoints and notes on particular
