@@ -34,7 +34,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip setuptools wheel
         pip install -r requirements.txt
-        pip install black isort pylint pytest
+        pip install black isort pylint pytest "moto[s3,server]"
 
     - name: Run pylint
       run: |

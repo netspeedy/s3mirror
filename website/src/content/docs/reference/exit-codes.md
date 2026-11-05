@@ -1,6 +1,6 @@
 ---
 title: Exit codes
-description: What s3mirror's exit codes 0, 1, 2 and 130 mean, what produces each, and what doesn't count as an error.
+description: What s3mirror's exit codes 0, 1, 2 and 130 mean, and what produces each.
 ---
 
 s3mirror exits with one of four codes, so a scheduler or script can tell a clean run from one that
@@ -19,15 +19,6 @@ The run went through every bucket and counted no errors. That includes runs that
 bucket already in sync, or `No buckets found to sync` because the source has none or they're all
 excluded.
 
-:::caution[0 doesn't mean every bucket was mirrored]
-A bucket whose objects couldn't be listed, on either side, is logged with
-`Failed to list objects in <bucket>` and treated as empty, and that isn't counted as an error. A
-failed listing of the source's buckets after the connection check is treated the same way. The run
-can exit 0 having mirrored nothing, or, with deletion on, having emptied a destination bucket.
-[Deletion](/s3mirror/how-it-works/deletion/#when-a-listing-fails) explains, and the scheduling
-guide suggests [what to alert on](/s3mirror/guides/scheduling/#what-to-alert-on).
-:::
-
 `--show-config`, `--version` and `--help` also exit 0, without connecting to anything.
 
 ## 1
@@ -37,8 +28,12 @@ The run counted at least one error, which is one of:
 - an object that failed to copy
 - an object that failed to delete
 - a destination bucket that couldn't be created, so the bucket was skipped
+- a bucket whose objects couldn't be listed in full on either side, so the bucket was skipped with
+  nothing copied or deleted
+- the source's bucket list, if it couldn't be read again after the connection check, in which case
+  no bucket is mirrored
 
-These don't stop the run: it finishes every bucket, prints the summary with
+These don't stop the run: it finishes every bucket it can, prints the summary with
 `⚠ Errors encountered: N` and `Status: COMPLETED WITH ERRORS`, and then exits 1.
 
 It also exits 1, without changing anything, when:

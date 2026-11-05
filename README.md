@@ -167,6 +167,10 @@ flowchart TD
     G -- No --> I[Keep on destination]
 ```
 
+If either listing fails, on its first page or partway through, the bucket is
+skipped with nothing copied or deleted and counted as an error, so a partial
+listing never makes objects look extraneous.
+
 It doesn't compare checksums, ETags, metadata, tags, storage class, ACLs,
 retention settings or version history. That keeps it fast, but two objects with the
 same key and size count as in sync even if their contents differ, metadata-only
@@ -339,13 +343,17 @@ Lint workflow runs on every pull request:
 
 ```bash
 python3 -m pip install -r requirements.txt
-python3 -m pip install black isort pylint pytest
+python3 -m pip install black isort pylint pytest "moto[s3,server]"
 black --check s3mirror.py tests
 isort --check-only s3mirror.py tests
 pylint s3mirror.py tests
 make test
 make container-smoke
 ```
+
+The tests in `tests/test_mirror.py` run s3mirror against two moto S3 servers that
+`tests/conftest.py` starts on localhost, one for each side, and inject failures into
+the calls s3mirror makes, so they need no network access or credentials.
 
 The Lint workflow runs pylint, black, isort and the tests on Python 3.11 to 3.14,
 builds the container, and builds and checks the website. Pushes to `main` are
@@ -386,9 +394,9 @@ the headline's words, measure them again with `uv run
 scripts/readme/measure_headline.py`.
 
 Contributions are welcome. Checksum-aware change detection, mirroring metadata,
-tags or storage class, tests against mocked S3 endpoints and notes on particular
-providers would all be useful. Keep pull requests focused, run the checks above,
-and say plainly if a change affects deletion, safety or compatibility.
+tags or storage class, and notes on particular providers would all be useful. Keep
+pull requests focused, run the checks above, and say plainly if a change affects
+deletion, safety or compatibility.
 
 ## License
 

@@ -21,14 +21,17 @@ run it again without cleaning anything up.
 2. **Bucket discovery.** It lists the source's buckets again and drops any named in
    `exclude_buckets`. The rest are handled one at a time, in the order the source returned them,
    which on most providers is alphabetical. If nothing is left, it logs `No buckets found to sync`
-   and goes straight to the summary.
+   and goes straight to the summary. If this second `ListBuckets` call fails, that's counted as an
+   error and it goes straight to the summary too.
 
 3. **Destination bucket.** For each bucket it calls `HeadBucket` at the destination. If that
    fails for any reason, it calls `CreateBucket` with the same name. If the create fails, the bucket
    is skipped, counted as an error, and the run moves on to the next one.
 
 4. **Listings.** It lists every object in the bucket on both sides with `ListObjectsV2`, page by
-   page, keeping each key and its size.
+   page, keeping each key and its size. If either listing fails, on any page, the bucket is
+   skipped with nothing copied or deleted, counted as an error, and the run moves on to the next
+   one.
 
 5. **Comparison.** A source object is copied if the destination has no object with that key, or
    has one of a different size. With deletion on, every destination key the source doesn't have is
@@ -79,10 +82,11 @@ as throughput. `--workers` overrides `max_workers` for one run.
 ## What a run counts as an error
 
 The error count, and so the exit code, covers objects that failed to copy, objects that failed to
-delete, and destination buckets that couldn't be created. A failed object listing isn't counted: it
-logs the error and carries on as if the bucket were empty. That has consequences for deletion, which
-[Deletion](/s3mirror/how-it-works/deletion/#when-a-listing-fails) explains, and it means a run can
-report `COMPLETED SUCCESSFULLY` and exit 0 when a bucket wasn't mirrored at all.
+delete, destination buckets that couldn't be created, buckets whose objects couldn't be listed on
+either side, and a failed listing of the source's buckets. A bucket that couldn't be created or
+listed is skipped, so a run that reports `COMPLETED SUCCESSFULLY` and exits 0 mirrored every bucket
+it found. [Deletion](/s3mirror/how-it-works/deletion/#when-a-listing-fails) explains why a failed
+listing never leads to deletions.
 
 ## Read on
 

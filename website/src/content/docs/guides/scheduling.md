@@ -38,7 +38,7 @@ run while the previous one still holds the lock. On systems without `flock`, use
 the scheduler offers.
 
 Cron mails whatever a job prints. With `--log-file`, that's only error lines, so a mail means
-something failed, including a failed bucket listing that doesn't change the exit code.
+something failed.
 
 ## systemd
 
@@ -101,11 +101,8 @@ rotated between runs without any signal or `copytruncate`:
 ## What to alert on
 
 - **A non-zero exit code.** 1 means at least one object failed to copy or delete, a destination
-  bucket couldn't be created, an endpoint couldn't be reached, or the config couldn't be read.
-  [Exit codes](/s3mirror/reference/exit-codes/) has the full list.
-- **`Failed to list objects` in the log.** A bucket whose objects couldn't be listed is treated as
-  empty and the run still exits 0. On the source side, with deletion on, that empties the
-  destination bucket; [Deletion](/s3mirror/how-it-works/deletion/#when-a-listing-fails) explains.
+  bucket couldn't be created or listed, an endpoint couldn't be reached, or the config couldn't be
+  read. [Exit codes](/s3mirror/reference/exit-codes/) has the full list.
 - **`No buckets found to sync`.** The source listed no buckets, or they were all excluded. The run
   exits 0.
 - **Runs that take much longer than usual.** s3mirror has no overall time limit, so a very slow

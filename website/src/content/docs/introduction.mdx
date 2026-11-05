@@ -28,7 +28,8 @@ scheduler whether the run counted any errors.
    time in the order the source lists them.
 
 3. For each bucket, it creates the bucket at the destination if it isn't there, then lists the
-   objects on both sides and compares them by key and size.
+   objects on both sides and compares them by key and size. If either listing fails, it skips the
+   bucket and counts an error.
 
 4. It copies every object that's missing at the destination or has a different size, up to 20 at
    a time by default. Each copy streams from the source through the machine running s3mirror to

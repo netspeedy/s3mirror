@@ -247,27 +247,31 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
         self.logger.debug("")
         return True
 
-    def get_source_buckets(self) -> List[str]:
-        """Retrieve list of bucket names from source."""
+    def get_source_buckets(self) -> Optional[List[str]]:
+        """Return the source's bucket names, or None if they couldn't be listed."""
         try:
             response = self.source_client.list_buckets()
-            all_buckets = [b["Name"] for b in response["Buckets"]]
-
-            buckets = [b for b in all_buckets if b not in self.exclude_buckets]
-
-            if self.exclude_buckets:
-                excluded = [b for b in all_buckets if b in self.exclude_buckets]
-                if excluded:
-                    self.logger.info(
-                        "Excluding %d bucket(s): %s", len(excluded), ", ".join(excluded)
-                    )
-                    self.logger.debug("  Excluded buckets: %s", excluded)
-
-            self.logger.debug("Total buckets to sync: %d", len(buckets))
-            return buckets
-        except botocore.exceptions.ClientError as err:
+        except (
+            botocore.exceptions.BotoCoreError,
+            botocore.exceptions.ClientError,
+        ) as err:
             self.logger.error("Failed to list source buckets: %s", err)
-            return []
+            self.stats["errors"] += 1
+            return None
+
+        all_buckets = [b["Name"] for b in response["Buckets"]]
+        buckets = [b for b in all_buckets if b not in self.exclude_buckets]
+
+        if self.exclude_buckets:
+            excluded = [b for b in all_buckets if b in self.exclude_buckets]
+            if excluded:
+                self.logger.info(
+                    "Excluding %d bucket(s): %s", len(excluded), ", ".join(excluded)
+                )
+                self.logger.debug("  Excluded buckets: %s", excluded)
+
+        self.logger.debug("Total buckets to sync: %d", len(buckets))
+        return buckets
 
     def bucket_exists(self, bucket_name: str) -> bool:
         """Check if bucket exists on destination."""
@@ -295,39 +299,49 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
             self.stats["errors"] += 1
             return False
 
-    def list_objects(self, client, bucket_name: str, label: str) -> Dict[str, int]:
-        """List all objects in bucket, returning {key: size} mapping."""
-        objects: Dict[str, int] = {}
-        try:
-            self.logger.debug("  Listing %s objects...", label)
-            paginator = client.get_paginator("list_objects_v2")
-            page_count = 0
-            obj_count = 0
+    def list_objects(
+        self, client, bucket_name: str, label: str
+    ) -> Optional[Dict[str, int]]:
+        """List every object in a bucket as {key: size}.
 
+        Returns None if the listing didn't complete, which is never the same as an
+        empty bucket: a partial listing would make the missing keys look extraneous.
+        """
+        objects: Dict[str, int] = {}
+        page_count = 0
+        self.logger.debug("  Listing %s objects...", label)
+        try:
+            paginator = client.get_paginator("list_objects_v2")
             for page in paginator.paginate(Bucket=bucket_name):
                 page_count += 1
-                if "Contents" in page:
-                    for obj in page["Contents"]:
-                        objects[obj["Key"]] = obj["Size"]
-                        obj_count += 1
-
-            self.logger.debug(
-                "    Found %d objects across %d page(s)", obj_count, page_count
+                for obj in page.get("Contents", []):
+                    objects[obj["Key"]] = obj["Size"]
+        except (
+            botocore.exceptions.BotoCoreError,
+            botocore.exceptions.ClientError,
+        ) as err:
+            self.logger.error(
+                "  Failed to list objects in %s on the %s: %s", bucket_name, label, err
             )
+            self.logger.debug(
+                "    Listed %d objects across %d page(s) before the failure",
+                len(objects),
+                page_count,
+            )
+            return None
 
-            if obj_count > 0:
-                sizes = list(objects.values())
-                total_size = sum(sizes)
-                avg_size = total_size / len(sizes)
-                self.logger.debug("    Total size: %s", self._format_bytes(total_size))
-                self.logger.debug(
-                    "    Average size: %s", self._format_bytes(int(avg_size))
-                )
-                self.logger.debug("    Largest: %s", self._format_bytes(max(sizes)))
-                self.logger.debug("    Smallest: %s", self._format_bytes(min(sizes)))
+        self.logger.debug(
+            "    Found %d objects across %d page(s)", len(objects), page_count
+        )
 
-        except botocore.exceptions.ClientError as err:
-            self.logger.error("  Failed to list objects in %s: %s", bucket_name, err)
+        if objects:
+            sizes = list(objects.values())
+            total_size = sum(sizes)
+            avg_size = total_size / len(sizes)
+            self.logger.debug("    Total size: %s", self._format_bytes(total_size))
+            self.logger.debug("    Average size: %s", self._format_bytes(int(avg_size)))
+            self.logger.debug("    Largest: %s", self._format_bytes(max(sizes)))
+            self.logger.debug("    Smallest: %s", self._format_bytes(min(sizes)))
 
         return objects
 
@@ -513,8 +527,20 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
             self.stats["buckets_skipped"] += 1
             return
 
+        # Mirror nothing in a bucket whose listing on either side didn't finish. A
+        # partial source listing would make the unlisted keys look extraneous, and a
+        # partial destination listing would copy objects that are already there.
         src_objects = self.list_objects(self.source_client, bucket_name, "source")
-        dest_objects = self.list_objects(self.dest_client, bucket_name, "destination")
+        dest_objects = None
+        if src_objects is not None:
+            dest_objects = self.list_objects(
+                self.dest_client, bucket_name, "destination"
+            )
+        if src_objects is None or dest_objects is None:
+            self.logger.warning("  Skipping bucket due to listing failure")
+            self.stats["buckets_skipped"] += 1
+            self.stats["errors"] += 1
+            return
 
         self.logger.info("  Source: %d objects", len(src_objects))
         self.logger.info("  Destination: %d objects", len(dest_objects))
@@ -588,6 +614,9 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
         self.logger.debug("=" * 70)
 
         buckets = self.get_source_buckets()
+
+        if buckets is None:
+            return
 
         if not buckets:
             self.logger.warning("No buckets found to sync")

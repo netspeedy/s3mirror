@@ -60,19 +60,28 @@ If the whole bucket is missing from the run, check that the source credential ca
 `ListBuckets` and that it isn't in `exclude_buckets`. The `Excluding` line near the top of the
 output names the buckets excluded.
 
-## Objects are copied on every run
+## A bucket is skipped after a listing failure
 
-A bucket whose listing fails is treated as empty. If the destination listing fails, every source
-object counts as new on every run. Look for `Failed to list objects in` in the output; the usual
-cause is a destination credential without `s3:ListBucket`.
+```text title="Output"
+  Failed to list objects in app-data on the source: An error occurred (AccessDenied) when calling the ListObjectsV2 operation: Access Denied
+  Skipping bucket due to listing failure
+```
+
+Nothing in the bucket is copied or deleted, the failure is counted as an error, and the run carries
+on with the next bucket. An `AccessDenied` means the credential on the side named can see the
+bucket but lacks `s3:ListBucket` on it: grant it, or add the bucket to `exclude_buckets` if it
+shouldn't be mirrored. A timeout or connection error in that line means the endpoint stopped
+answering and botocore's retries ran out; the next run lists the bucket again from the start. [Deletion](/s3mirror/how-it-works/deletion/#when-a-listing-fails) explains why a partial
+listing is never used.
 
 ## More was deleted than expected
 
-Deletion removes every destination object the source doesn't have, in each mirrored bucket. If a
-source bucket's listing fails, that's every object in the destination bucket, and the run still
-exits 0. Look for `Failed to list objects in` just before the bucket's `Actions:` line, then read
-[Deletion](/s3mirror/how-it-works/deletion/#when-a-listing-fails). If the destination has versioning
-on, the deleted objects can be restored by removing their delete markers.
+Deletion removes every destination object the source doesn't have, in each mirrored bucket,
+including objects someone wrote straight to the destination. The log file, or `--debug`, names each
+key with a `✓ Deleted:` line. Check that `source` points at the endpoint and credential you meant,
+because a source that's been emptied or swapped is mirrored faithfully, and read
+[Deletion](/s3mirror/how-it-works/deletion/). If the destination has versioning on, the deleted
+objects can be restored by removing their delete markers.
 
 ## The output is too noisy for cron
 

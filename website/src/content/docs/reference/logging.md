@@ -87,17 +87,18 @@ counts on each side, the `Actions:` line, the copy and delete totals with their 
 `Already synchronized (no changes needed)`, and the bucket's time. Then the summary.
 
 **Warning** marks something that didn't happen: `No buckets found to sync`,
-`Skipping bucket due to creation failure`, `⚠ N objects failed to copy` or `failed to delete`,
-`⚠ Errors encountered: N` in the summary, and `Operation cancelled by user (Ctrl+C)`.
+`Skipping bucket due to creation failure` or `due to listing failure`, `⚠ N objects failed to copy`
+or `failed to delete`, `⚠ Errors encountered: N` in the summary, and
+`Operation cancelled by user (Ctrl+C)`.
 
 **Error** is a failed call: the connection check (`✗ Source connection FAILED` with the error code,
 message and HTTP status), `Failed to list source buckets`, `Failed to create bucket`,
-`Failed to list objects in <bucket>`, `Failed to copy <key>`, `Failed to delete <key>`, and
-`FATAL ERROR` with a traceback for anything unexpected.
+`Failed to list objects in <bucket> on the source` or `on the destination`, `Failed to copy <key>`,
+`Failed to delete <key>`, and `FATAL ERROR` with a traceback for anything unexpected.
 
 **Debug** adds the detail: the settings in use with access keys shortened to their first and last
 four characters, a sample of the source's bucket names, each listing's object count, page count and
-sizes, every `New file:` and `Changed:` decision, the keys to delete, every key copied or deleted,
+sizes, or how far a failed listing got, every `New file:` and `Changed:` decision, the keys to delete, every key copied or deleted,
 progress every 50 copies, and per-bucket timings.
 
 ## The summary
@@ -126,7 +127,7 @@ Average throughput: 36.6MB/s
 ```
 
 `Processed` counts buckets that got as far as the comparison, whatever happened to their copies.
-A `Skipped` line appears when a bucket couldn't be created, `Average throughput` only when something
+A `Skipped` line appears when a bucket couldn't be created or listed, `Average throughput` only when something
 was copied, and with any errors the status line becomes `⚠ Errors encountered: N` followed by
 `Status: COMPLETED WITH ERRORS`. A run stopped by Ctrl+C or a fatal error prints no summary.
 
