@@ -348,7 +348,8 @@ image, the Actions and the website weekly, and green Dependabot pull requests ar
 merged automatically.
 
 Automated Release tags `v<__version__>` when that tag doesn't exist yet, which
-publishes the image and the Homebrew formula, so you release a change of your own
+publishes the image, the Homebrew formula and the GitHub release, with notes
+generated from the pull requests since the previous release, so you release a change of your own
 by bumping `__version__` in its pull request. Automated updates release
 themselves: when release-bearing commits have landed since the last tag
 (`feat:`, `fix:`, `deps:`, `build:` and the others
