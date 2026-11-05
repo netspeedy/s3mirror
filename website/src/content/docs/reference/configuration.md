@@ -53,15 +53,16 @@ Both sections take the same keys. Each one configures one `boto3` S3 client.
 | `aws_access_key_id` | `SOURCE_ACCESS_KEY`, `DEST_ACCESS_KEY` | Access key for the endpoint. Debug output shows only its first and last four characters; `--show-config` shows it in full. |
 | `aws_secret_access_key` | `SOURCE_SECRET_KEY`, `DEST_SECRET_KEY` | Secret key for the endpoint. Never logged, and redacted by `--show-config`. |
 | `region_name` | `us-east-1` | Region used to sign requests. Many non-AWS services ignore it but still need one. |
-| `verify_ssl` | `false` | TLS certificate verification, passed to `boto3` as `verify`: `true`, `false`, or the path to a CA bundle. |
+| `verify_ssl` | `true` | TLS certificate verification, passed to `boto3` as `verify`: `true`, `false`, or the path to a CA bundle. |
 
 The defaults are placeholders, so a working config sets at least the endpoint and both keys on each
 side. With both keys on a side set to `null`, `boto3` uses its own credential chain for that client;
 with only one of them `null`, the run stops with `FATAL ERROR: Partial credentials found` and exit
 code 1.
 
-When `verify_ssl` is `false` on either side, s3mirror turns off `urllib3`'s insecure-request
-warnings for both.
+When `verify_ssl` is `false` on a side, s3mirror logs one warning saying so for that endpoint and
+turns off `urllib3`'s per-request insecure-request warnings. Up to 1.0.4 the default was `false`;
+[Safety](/s3mirror/how-it-works/safety/#tls) has what that means for an existing config.
 
 ## `performance`
 

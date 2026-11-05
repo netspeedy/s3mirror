@@ -8,20 +8,27 @@ Nothing here talks to a real S3 service.
 # The fault injection wraps S3Mirror._create_client.
 # pylint: disable=protected-access
 
+import ipaddress
 import json
 import socket
+import ssl
 import subprocess
 import sys
 import time
 import urllib.error
 import urllib.request
 from contextlib import closing
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
 
 import boto3
 import pytest
 from botocore.awsrequest import AWSResponse
 from botocore.config import Config
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 import s3mirror
 
@@ -32,17 +39,96 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
-class Endpoint:
-    """One moto S3 server, standing in for one side of the mirror."""
+def _self_signed_certificate(directory) -> tuple:
+    """Write a self-signed certificate for 127.0.0.1 and its key, returning both paths.
 
-    def __init__(self) -> None:
+    It's its own CA, so the certificate file doubles as the CA bundle that trusts it.
+    """
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name(
+        [x509.NameAttribute(NameOID.COMMON_NAME, "s3mirror test endpoint")]
+    )
+    now = datetime.now(timezone.utc)
+    usage = x509.KeyUsage(
+        digital_signature=True,
+        content_commitment=False,
+        key_encipherment=False,
+        data_encipherment=False,
+        key_agreement=False,
+        key_cert_sign=True,
+        crl_sign=False,
+        encipher_only=False,
+        decipher_only=False,
+    )
+    public = key.public_key()
+    certificate = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(public)
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(minutes=5))
+        .not_valid_after(now + timedelta(days=1))
+        .add_extension(
+            x509.SubjectAlternativeName(
+                [x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]
+            ),
+            critical=False,
+        )
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .add_extension(usage, critical=True)
+        .add_extension(
+            x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]), critical=False
+        )
+        .add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(public), critical=False
+        )
+        .add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_public_key(public), critical=False
+        )
+        .sign(key, hashes.SHA256())
+    )
+    cert_path = directory / "endpoint.pem"
+    key_path = directory / "endpoint.key"
+    cert_path.write_bytes(certificate.public_bytes(serialization.Encoding.PEM))
+    key_path.write_bytes(
+        key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
+    return str(cert_path), str(key_path)
+
+
+class Endpoint:
+    """One moto S3 server, standing in for one side of the mirror.
+
+    With `tls`, a (certificate, key) pair, it serves HTTPS with that certificate, and
+    `ca` is the bundle that trusts it.
+    """
+
+    def __init__(self, tls=None) -> None:
         port = _free_port()
-        self.url = f"http://127.0.0.1:{port}"
+        command = [
+            sys.executable,
+            "-m",
+            "moto.server",
+            "-H",
+            "127.0.0.1",
+            "-p",
+            str(port),
+        ]
+        self.ca = None
+        self._context = None
+        if tls:
+            self.ca = tls[0]
+            self._context = ssl.create_default_context(cafile=self.ca)
+            command += ["-c", tls[0], "-k", tls[1]]
+        self.url = f"{'https' if tls else 'http'}://127.0.0.1:{port}"
         # pylint: disable-next=consider-using-with
         self._process = subprocess.Popen(
-            [sys.executable, "-m", "moto.server", "-H", "127.0.0.1", "-p", str(port)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
         deadline = time.monotonic() + 30
         while not self._ready():
@@ -56,12 +142,14 @@ class Endpoint:
             aws_access_key_id="testing",
             aws_secret_access_key="testing",
             region_name="us-east-1",
+            verify=self.ca,
             config=Config(s3={"addressing_style": "path"}),
         )
 
     def _ready(self) -> bool:
+        url = f"{self.url}/moto-api/"
         try:
-            with urllib.request.urlopen(f"{self.url}/moto-api/", timeout=1):
+            with urllib.request.urlopen(url, timeout=1, context=self._context):
                 return True
         except (urllib.error.URLError, ConnectionError):
             return False
@@ -69,7 +157,7 @@ class Endpoint:
     def reset(self) -> None:
         """Forget every bucket and object."""
         request = urllib.request.Request(f"{self.url}/moto-api/reset", method="POST")
-        with urllib.request.urlopen(request, timeout=5):
+        with urllib.request.urlopen(request, timeout=5, context=self._context):
             pass
 
     def stop(self) -> None:
@@ -113,6 +201,24 @@ def endpoints_fixture():
             endpoint.stop()
 
 
+@pytest.fixture(scope="session", name="tls_endpoint")
+def tls_endpoint_fixture(tmp_path_factory):
+    """Start one HTTPS server with a self-signed certificate, for TLS tests."""
+    tls = _self_signed_certificate(tmp_path_factory.mktemp("tls"))
+    endpoint = Endpoint(tls)
+    try:
+        yield endpoint
+    finally:
+        endpoint.stop()
+
+
+@pytest.fixture(name="tls_source")
+def tls_source_fixture(tls_endpoint):
+    """An HTTPS source endpoint with a self-signed certificate, emptied before each test."""
+    tls_endpoint.reset()
+    return tls_endpoint
+
+
 @pytest.fixture(name="source")
 def source_fixture(endpoints):
     """The source endpoint, emptied before each test."""
@@ -127,13 +233,13 @@ def destination_fixture(endpoints):
     return endpoints[1]
 
 
-def _side(endpoint: Endpoint, key: str) -> dict:
+def endpoint_config(endpoint: Endpoint, key: str) -> dict:
+    """The config section for one side of the mirror, pointing at `endpoint`."""
     return {
         "endpoint_url": endpoint.url,
         "aws_access_key_id": f"{key}_ACCESS_KEY_ID",
         "aws_secret_access_key": f"{key}_SECRET_ACCESS_KEY",
         "region_name": "us-east-1",
-        "verify_ssl": False,
     }
 
 
@@ -141,8 +247,8 @@ def _side(endpoint: Endpoint, key: str) -> dict:
 def config_fixture(source, destination):
     """A config pointing s3mirror at the two test endpoints."""
     return {
-        "source": _side(source, "SOURCE"),
-        "destination": _side(destination, "DEST"),
+        "source": endpoint_config(source, "SOURCE"),
+        "destination": endpoint_config(destination, "DEST"),
     }
 
 
@@ -183,8 +289,8 @@ class Faults:
         self._rules: dict = {"SOURCE": [], "DESTINATION": []}
         create_client = s3mirror.S3Mirror._create_client
 
-        def create_with_faults(mirror, endpoint_config, label):
-            client = create_client(mirror, endpoint_config, label)
+        def create_with_faults(mirror, section, label):
+            client = create_client(mirror, section, label)
             for event, handler in self._rules[label]:
                 client.meta.events.register(event, handler)
             return client

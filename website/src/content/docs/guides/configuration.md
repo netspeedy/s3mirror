@@ -91,8 +91,10 @@ instance role). The chain is the same for both sides, so that only makes sense f
 Setting just one of the pair to `null` stops the run with `FATAL ERROR: Partial credentials found`
 and exit code 1.
 
-`verify_ssl` defaults to `false`. Set it to `true`, or to the path of a CA bundle for a private CA;
-[Safety](/s3mirror/how-it-works/safety/#tls) explains why.
+`verify_ssl` defaults to `true`, which checks the endpoint's certificate against the system's
+trusted CAs. For a private CA or a self-signed certificate, set it to the path of the CA bundle, as
+the destination above does; [Safety](/s3mirror/how-it-works/safety/#tls) explains when `false` is
+acceptable.
 
 ## Choosing what's mirrored
 

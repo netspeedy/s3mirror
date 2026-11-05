@@ -31,8 +31,10 @@ The error code is the provider's, so it usually says what's wrong:
 A failure that isn't an S3 error is logged on one line as `✗ Source connection error:` followed by
 the exception, for example a DNS failure, a refused connection or a certificate that doesn't
 verify. Check the scheme and port in `endpoint_url`, that this machine can reach it, and
-`verify_ssl`. A `certificate verify failed` error with `verify_ssl: true` usually means a private
-CA: point `verify_ssl` at its bundle, as [Safety](/s3mirror/how-it-works/safety/#tls) shows.
+`verify_ssl`. A `CERTIFICATE_VERIFY_FAILED` error means the endpoint's certificate doesn't verify
+against the system's trusted CAs, usually because it's self-signed or from a private CA: point
+`verify_ssl` at the CA bundle, as [Safety](/s3mirror/how-it-works/safety/#tls) shows. Configs
+written for 1.0.4 or earlier often relied on the old `false` default.
 
 ## A destination bucket isn't created
 

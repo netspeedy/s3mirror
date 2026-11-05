@@ -223,11 +223,16 @@ sync:
 | `aws_access_key_id` | placeholder | Access key for the endpoint. |
 | `aws_secret_access_key` | placeholder | Secret key for the endpoint. |
 | `region_name` | `us-east-1` | Region passed to `boto3`. Many non-AWS services still expect one. |
-| `verify_ssl` | `false` | TLS certificate verification. Set it to `true` unless the endpoint really uses a self-signed certificate on a network you trust. |
+| `verify_ssl` | `true` | TLS certificate verification: `true`, `false`, or the path to a CA bundle for a private CA or a self-signed certificate. |
 
 The endpoint and key defaults are the placeholders from the example above, such as
 `https://s3.source.example.com` and `SOURCE_ACCESS_KEY`. They fail the connection
 check, so set all three on both sides.
+
+`verify_ssl` defaulted to `false` up to and including 1.0.4. A config that leaves it
+out and points at an endpoint with a self-signed or private-CA certificate now fails
+the connection check with `CERTIFICATE_VERIFY_FAILED`, so set it to the CA bundle's
+path for that endpoint, or to `false` if you really can't verify it.
 
 `performance` tunes transfers:
 
@@ -332,9 +337,9 @@ wants them created in a particular region or ahead of time.
 
 If an object isn't copied again, its key and size match, so s3mirror considers it
 in sync. Delete or rename the destination copy to force a copy. If cron output is
-too noisy, use `--quiet` with `--log-file`. s3mirror suppresses `urllib3`'s
-insecure-certificate warnings when `verify_ssl` is `false` so the logs stay
-readable, but the TLS risk is still there.
+too noisy, use `--quiet` with `--log-file`. With `verify_ssl: false`, s3mirror logs
+one `⚠ TLS certificate verification is off` line for that endpoint in place of
+`urllib3`'s per-request warnings, but the TLS risk is still there.
 
 ## Development
 

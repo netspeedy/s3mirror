@@ -28,18 +28,17 @@ source:
   endpoint_url: "https://s3.source.example.com"
   aws_access_key_id: "SOURCE_ACCESS_KEY"
   aws_secret_access_key: "SOURCE_SECRET_KEY"
-  verify_ssl: true
 
 destination:
   endpoint_url: "https://s3.destination.example.com"
   aws_access_key_id: "DEST_ACCESS_KEY"
   aws_secret_access_key: "DEST_SECRET_KEY"
-  verify_ssl: true
 ```
 
-`verify_ssl` defaults to `false`, which turns TLS certificate checks off, so set it to `true` for
-any endpoint with a real certificate. The file holds both secret keys: keep it readable only by the
-account that runs s3mirror, for example with `chmod 600 config.yaml`.
+TLS certificates are checked by default. For an endpoint with a self-signed certificate or one from
+a private CA, set `verify_ssl` to the CA bundle's path, as [Safety](/s3mirror/how-it-works/safety/#tls)
+shows. The file holds both secret keys: keep it readable only by the account that runs s3mirror, for
+example with `chmod 600 config.yaml`.
 
 Print the configuration s3mirror will actually use, with your file merged over the defaults:
 
