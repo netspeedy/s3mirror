@@ -10,7 +10,7 @@ container-smoke: container-build
 	docker run --rm $(IMAGE) --version
 
 website-install:
-	npm --prefix $(WEBSITE_DIR) install
+	npm --prefix $(WEBSITE_DIR) ci
 
 website-check:
 	test -d $(WEBSITE_DIR)/node_modules || (printf 'missing website dependencies; run `make website-install`\n' >&2 && exit 1)
