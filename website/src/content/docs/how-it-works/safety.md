@@ -31,8 +31,8 @@ run overwriting and deleting your real data. A destination credential without `s
 logged errors rather than lost data, and each refused delete is counted, so the run exits 1.
 
 Make sure the source credential can list every bucket it can see. A bucket that shows up in
-`ListBuckets` but can't be listed is treated as empty, which with deletion on empties its
-destination copy; [Deletion](/s3mirror/how-it-works/deletion/#when-a-listing-fails) has the
+`ListBuckets` but can't be listed is skipped, with nothing copied or deleted, and counted as an
+error on every run; [Deletion](/s3mirror/how-it-works/deletion/#when-a-listing-fails) has the
 details.
 
 ## TLS
@@ -74,5 +74,4 @@ ID, and never the secret keys.
 3. Turn on versioning at the destination, or keep an independent backup of anything you can't
    lose. s3mirror's deletions are plain `DeleteObject` calls.
 4. Try new endpoints and credential changes against a non-production bucket first.
-5. For scheduled runs, use `--log-file`, alert on a non-zero exit code, and watch the log for
-   `Failed to list objects`, which doesn't change the exit code.
+5. For scheduled runs, use `--log-file` and alert on a non-zero exit code.

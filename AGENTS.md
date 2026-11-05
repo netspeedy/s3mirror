@@ -61,7 +61,7 @@
 - Install the runtime dependencies and the development tools:
   ```bash
   python3 -m pip install -r requirements.txt
-  python3 -m pip install black isort pylint pytest
+  python3 -m pip install black isort pylint pytest "moto[s3,server]"
   ```
 - Check formatting and imports, and run pylint and the tests, as the Lint
   workflow does:
@@ -165,9 +165,12 @@
   make test
   python3 s3mirror.py --help
   ```
-- s3mirror has no tests against S3 yet. For a change to mirroring behaviour,
-  check it against a disposable endpoint or an in-process fake, never against
-  data you care about, and say in the pull request what you ran.
+- `tests/test_mirror.py` runs `main()` against two moto S3 servers that
+  `tests/conftest.py` starts on localhost, one per side, so the source and the
+  destination keep separate state. The `faults` fixture makes chosen calls from
+  s3mirror's own clients fail, with an S3 error or a raised exception, and can
+  shrink listing pages to test pagination. A change to mirroring behaviour gets a
+  test there. Never point a test at a real endpoint.
 - If you change shell scripts, also run:
   ```bash
   bash -n scripts/release/*.sh

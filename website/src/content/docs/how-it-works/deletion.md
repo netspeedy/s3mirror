@@ -1,6 +1,6 @@
 ---
 title: Deletion
-description: Which destination objects s3mirror deletes, when it deletes them, how to turn it off, and the case where a failed listing empties a destination bucket.
+description: Which destination objects s3mirror deletes, when it deletes them, how to turn it off, and why a failed listing means nothing is deleted.
 ---
 
 With deletion on, s3mirror deletes every object in a mirrored destination bucket whose key isn't in
@@ -21,7 +21,9 @@ Deletion works bucket by bucket, and only on the buckets s3mirror is mirroring i
 - Buckets themselves are never deleted, even when the source bucket has gone.
 
 Deletion compares keys only. An object whose key exists on both sides is never deleted, though it
-may be overwritten if its size differs.
+may be overwritten if its size differs. And it only ever works from two complete listings: if either
+side's listing fails, nothing in that bucket is deleted, as [below](#when-a-listing-fails)
+explains.
 
 ## When it happens
 
@@ -66,33 +68,32 @@ expire noncurrent versions so they don't pile up.
 
 ## When a listing fails
 
-:::danger[A failed source listing deletes the destination bucket's contents]
-If listing a source bucket's objects fails, for example because the source credential lacks
-`s3:ListBucket` on that bucket, s3mirror logs the error and treats the source bucket as empty. With
-deletion on, every object in the destination bucket then counts as extraneous and is deleted. The
-listing error isn't counted as an error, so the run can still end with
-`✓ Status: COMPLETED SUCCESSFULLY` and exit 0.
-:::
+If listing a bucket's objects fails on either side, s3mirror skips that bucket: nothing in it is
+copied and nothing is deleted. That holds whether the listing fails on its first page or partway
+through a large bucket, and whether the cause is an S3 error, such as a credential without
+`s3:ListBucket` on that bucket, or a timeout or dropped connection that outlasted botocore's
+retries. A partial listing is never used, because the keys it didn't reach would look as if the
+source no longer had them.
 
-This is what it looks like for a bucket that was already in sync:
+The skipped bucket counts as an error, so the run carries on with the other buckets, ends with
+`Status: COMPLETED WITH ERRORS` and exits 1. This is what it looks like when the source credential
+can't list one bucket:
 
 ```text title="Output"
-  Failed to list objects in app-data: An error occurred (AccessDenied) when calling the ListObjectsV2 operation: Access Denied
-  Source: 0 objects
-  Destination: 4 objects
-  Actions: 0 to copy (0.0B), 4 to delete
-  ✓ Deleted 4 objects in 0.0s
+  Failed to list objects in app-data on the source: An error occurred (AccessDenied) when calling the ListObjectsV2 operation: Access Denied
+  Skipping bucket due to listing failure
 ```
 
-The same applies if the listing fails partway through a large bucket: the keys after the failure
-count as missing from the source. s3mirror doesn't stop on a failed listing, so guard against this
-in the config and in permissions:
+With `--debug`, a line between those two says how many objects were listed before the failure. A bucket that
+keeps failing is skipped on every run until the credential can list it, so grant `s3:ListBucket` on
+it, or add it to `exclude_buckets` if it shouldn't be mirrored.
 
-- Give the source credential `s3:ListBucket` on every bucket it can see, and check it with a
-  `--no-delete --debug` run after any change to its permissions.
-- Exclude any bucket the source credential can list in `ListBuckets` but not read.
-- Watch scheduled logs for `Failed to list objects` as well as the exit code.
-- Keep versioning on at the destination, so a run like this can be rolled back.
+The same goes for the source's bucket list. If the second `ListBuckets` call, after the connection
+check, fails, no bucket is mirrored and the run exits 1.
 
-A failed listing on the destination side is less dangerous: the destination bucket is treated as
-empty, so every source object is copied again and nothing is deleted.
+:::caution[Releases up to 1.0.4 deleted on a failed listing]
+Up to and including 1.0.4, a failed listing was treated as an empty bucket and wasn't counted as an
+error. A failed source listing with deletion on deleted every object in the destination bucket, or,
+if it failed partway, every object the listing hadn't reached, and the run still exited 0. If you run one of those
+releases, upgrade, or run with `--no-delete` until you can.
+:::
