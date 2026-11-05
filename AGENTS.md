@@ -46,11 +46,15 @@
   `src/lib/sections.ts` and the palette and mark colours at the top of
   `theme.css`. Keep it that way, so a change to a shared file can be copied
   between the sites as it is.
-- The shared components support versioned docs, but s3mirror doesn't publish
-  archived release lines, so the version menu lists only the current release
-  and `website/src/content/docs` always describes the latest one. Never copy
-  pages into per-version folders. Keep page links root-relative
-  (`/s3mirror/...`).
+- The docs are versioned by release line, and `website/src/content/docs`
+  always describes the latest one. Never copy pages into per-version folders.
+  When the first release of a new line (`vX.Y.0`) is published, GitHub Release
+  rebuilds the outgoing line from git with `SITE_ARCHIVE=vX.Y`, from the commit
+  `scripts/release/docs-archive-commit.sh` picks, and attaches it to that
+  line's last release; Deploy Pages Site publishes it under `/s3mirror/vX.Y/`.
+  Keep page links root-relative (`/s3mirror/...`): archived builds rewrite them
+  into their own line. `website/README.md` has the details and the steps to
+  rebuild an archive by hand.
 - Keep the website out of `.github/`. Dependabot stopped being able to open npm
   pull requests for manifests under `.github/` in June 2026 (its create-PR call
   is rejected as "invalid or unauthorized changes"), which is why it lives at
@@ -154,7 +158,10 @@
 - Deploy Pages Site runs on pushes to `main`, published releases and completed
   GitHub Release runs. GitHub Release creates releases with `GITHUB_TOKEN`,
   which doesn't start release-event workflows, so the `workflow_run` trigger is
-  what puts a new version on the site.
+  what puts a new version on the site. The docs archive jobs are in GitHub
+  Release for the same reason: the archive is attached before the run
+  completes. A failed archive build is reported in the run's summary and
+  doesn't fail the release.
 
 ## Testing Expectations
 
@@ -186,6 +193,10 @@
   bash scripts/release/next-release.sh
   bash scripts/release/automated-only.sh "$(git describe --tags --abbrev=0)" HEAD
   ```
+- If you change the docs archive, rehearse it in a scratch clone with a
+  local-only tag for the next line, as `website/README.md` describes, and run
+  `make website-check` on both the archive and the latest build with the
+  archive unpacked into it. Never push a rehearsal tag.
 
 ## Commit & PR Rules
 

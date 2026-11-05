@@ -390,7 +390,9 @@ Actions updates are `ci:` and website updates `chore:`.
 
 The [docs site](https://netspeedy.github.io/s3mirror/) is built with Astro and
 Starlight from `website/`, and its [README](website/README.md) covers the `make
-website-*` targets and how the site is published. If you change a flag, a config
+website-*` targets and how the site is published. The docs are versioned by release
+line: when a new minor or major ships, GitHub Release archives the outgoing line's
+docs, and the site serves them under `/s3mirror/vX.Y/`. If you change a flag, a config
 key, a log line or what gets deleted, update the matching pages in the same change.
 `tests/test_docs.py` fails until the CLI reference page lists exactly the flags the
 parser accepts. [AGENTS.md](AGENTS.md) has the repository's conventions in full.

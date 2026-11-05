@@ -43,9 +43,51 @@ parser without updating `src/content/docs/reference/cli.mdx`.
 
 ## Versions
 
-The shared components can serve older release lines beside the latest, but
-s3mirror doesn't publish archived lines, so the version menu in the header lists
-only the current release. Every page describes the latest release.
+The docs are versioned by release line. The latest line is built at the site
+root, and each older line is served under its own path, such as
+`https://netspeedy.github.io/s3mirror/v1.0/`. The version menu in the header lists
+them, and an older line's pages open with a notice that links to the same page in
+the latest docs.
+
+Only the latest line's pages live here; never copy pages into per-version folders,
+and keep page links root-relative (`/s3mirror/...`) so archived builds can rewrite
+them. When the first release of a new line is published, such as `v1.1.0`, GitHub
+Release finds the commit the old line's docs are archived from, builds the site
+from it with `SITE_ARCHIVE` set to the old line, and attaches the result to the old
+line's last release as `s3mirror-docs-<line>.tar.gz`. Deploy Pages Site unpacks
+every such archive into the site before `make website-check`, lists them in
+`versions.json` at the root, and archived lines read that file when they load, so
+their menus include lines released after them. A failed archive doesn't fail the
+release: the job reports it in its summary and leaves the line unpublished.
+
+The commit comes from `scripts/release/docs-archive-commit.sh`: it's the one just
+before the first release-bearing commit (`feat:`, `fix:` and the others
+`next-release.sh` counts) after the old line's last release, because everything
+after that release ships in the new line. Docs and CI changes that landed before it
+are kept. s3mirror's versions come from bumping `__version__`, so a new minor
+doesn't need a `feat:` commit, which is why it doesn't look for one. v1.0 is the
+first line that gets an archive, built from the commit that added this site. A line
+whose commit predates the site, or whose last release has no GitHub release to
+attach to, is skipped.
+
+To build an archived line by hand, for example to replace a lost one, check out the
+commit the script prints and build it with the line set. The docs-archive job in
+`.github/workflows/github-release.yml` shows how it writes the
+`SITE_METADATA_FILE` the pages read their release from.
+
+```bash
+git checkout "$(bash scripts/release/docs-archive-commit.sh v1.0.4 v1.1.0)"
+SITE_ARCHIVE=v1.0 make website-build
+SITE_ARCHIVE=v1.0 make website-check
+tar -C website/dist -czf s3mirror-docs-v1.0.tar.gz .
+gh release upload v1.0.4 s3mirror-docs-v1.0.tar.gz --clobber
+```
+
+To rehearse a change to any of this, clone the repository somewhere disposable,
+tag `HEAD` there with the next line's first version (`git tag v1.1.0`, never
+pushed), and run the job's steps by hand: the archive build and its check, then the
+latest build with `docs_versions` in its metadata, the archive unpacked into
+`website/dist/v1.0/`, and `make website-check` over the result.
 
 ## How it's published
 
@@ -53,7 +95,8 @@ Deploy Pages Site runs on every push to `main`, when a release is published by
 hand, and after each GitHub Release run. That last trigger is what puts a new
 version on the site: GitHub Release creates releases with `GITHUB_TOKEN`, which
 doesn't start release-event workflows. It can also be started by hand. It writes
-the latest release's tag and URL to a JSON file, passes it to the build in
-`SITE_METADATA_FILE`, runs `make website-check` over the result and deploys it. Dependabot checks the npm
-dependencies here weekly and titles its pull requests `chore:`, so a site update
-doesn't cut a release.
+the latest release's tag and URL, and the archived lines it found, to a JSON file,
+passes it to the build in `SITE_METADATA_FILE`, unpacks the archived lines into the
+build, runs `make website-check` over the result and deploys it. Dependabot checks
+the npm dependencies here weekly and titles its pull requests `chore:`, so a site
+update doesn't cut a release.
