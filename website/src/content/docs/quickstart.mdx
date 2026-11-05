@@ -1,0 +1,208 @@
+---
+title: Quickstart
+description: Install s3mirror, describe both endpoints in a config file, check it, run a copy-only mirror, then turn deletion on.
+---
+
+import { Steps } from "@astrojs/starlight/components";
+import InstallTabs from "../../components/InstallTabs.astro";
+import NextSteps from "../../components/NextSteps.astro";
+
+## Install
+
+<InstallTabs />
+
+Check it's on your path:
+
+```bash
+s3mirror --version
+```
+
+## Describe both endpoints
+
+s3mirror has no useful defaults for the endpoints, so it always needs a config file. Put the source
+and destination in `config.yaml`. Anything you leave out takes its default, so this is enough to
+start:
+
+```yaml title="config.yaml"
+source:
+  endpoint_url: "https://s3.source.example.com"
+  aws_access_key_id: "SOURCE_ACCESS_KEY"
+  aws_secret_access_key: "SOURCE_SECRET_KEY"
+  verify_ssl: true
+
+destination:
+  endpoint_url: "https://s3.destination.example.com"
+  aws_access_key_id: "DEST_ACCESS_KEY"
+  aws_secret_access_key: "DEST_SECRET_KEY"
+  verify_ssl: true
+```
+
+`verify_ssl` defaults to `false`, which turns TLS certificate checks off, so set it to `true` for
+any endpoint with a real certificate. The file holds both secret keys: keep it readable only by the
+account that runs s3mirror, for example with `chmod 600 config.yaml`.
+
+Print the configuration s3mirror will actually use, with your file merged over the defaults:
+
+```bash
+s3mirror --config config.yaml --show-config
+```
+
+```json title="Output"
+{
+  "source": {
+    "endpoint_url": "https://s3.source.example.com",
+    "aws_access_key_id": "SOURCE_ACCESS_KEY",
+    "aws_secret_access_key": "***REDACTED***",
+    "region_name": "us-east-1",
+    "verify_ssl": true
+  },
+  "destination": {
+    "endpoint_url": "https://s3.destination.example.com",
+    "aws_access_key_id": "DEST_ACCESS_KEY",
+    "aws_secret_access_key": "***REDACTED***",
+    "region_name": "us-east-1",
+    "verify_ssl": true
+  },
+  "performance": {
+    "max_workers": 20,
+    "multipart_threshold": 8388608,
+    "multipart_chunksize": 8388608,
+    "max_concurrency": 10,
+    "max_pool_connections": 50
+  },
+  "sync": {
+    "delete_extraneous": true,
+    "exclude_buckets": []
+  }
+}
+```
+
+Note `"delete_extraneous": true` at the bottom. That's the default, and it means a normal run
+deletes destination objects the source doesn't have.
+
+## Run it copy-only
+
+Make the first run copy-only, so nothing at the destination is deleted:
+
+```bash
+s3mirror --config config.yaml --no-delete
+```
+
+In this example the source has two buckets. The destination already has `app-data`, holding one
+matching export, an older copy of `config/settings.json` and a stray `exports/old-report.csv`, and
+doesn't have `media-assets` at all:
+
+```text title="Output"
+======================================================================
+S3 BUCKET MIRROR
+Session started: 2026-11-05 08:10:53
+======================================================================
+✓ Source connected successfully (2 buckets)
+✓ Destination connected successfully (1 buckets)
+
+Starting synchronization of 2 bucket(s)
+Performance: 20 workers, 8.0MB multipart threshold
+
+======================================================================
+[1/2]: app-data
+======================================================================
+  Source: 4 objects
+  Destination: 3 objects
+  Actions: 3 to copy (100.8KB), 0 to delete
+  ✓ Copied 3 objects in 0.0s (39.8MB/s)
+  ✓ Bucket completed in 0.0s
+
+======================================================================
+[2/2]: media-assets
+======================================================================
+  ✓ Created bucket: media-assets
+  Source: 2 objects
+  Destination: 0 objects
+  Actions: 2 to copy (742.2KB), 0 to delete
+  ✓ Copied 2 objects in 0.0s (40.3MB/s)
+  ✓ Bucket completed in 0.0s
+
+======================================================================
+FINAL SUMMARY
+======================================================================
+Started:  2026-11-05 08:10:53
+Finished: 2026-11-05 08:10:53
+Duration: 0.0s (0s)
+
+Buckets:
+  - Processed: 2
+  - Created:   1
+
+Objects:
+  - Copied:    5
+  - Deleted:   0
+
+Data transferred: 843.0KB
+Average throughput: 36.6MB/s
+
+✓ Status: COMPLETED SUCCESSFULLY
+======================================================================
+```
+
+The two new exports and the changed `settings.json` were copied, the matching export was skipped,
+and `media-assets` was created and filled. The stray `old-report.csv` is still there, because
+`--no-delete` was set. These runs were made against an in-process stand-in for the two endpoints,
+which is why the transfers are so quick; the output is otherwise exactly what s3mirror prints.
+
+Add `--debug` to see each decision, such as which objects counted as new and which as changed.
+[Logging](/s3mirror/reference/logging/) shows what that looks like.
+
+## Let it delete
+
+When the copy-only run looks right, run it again without `--no-delete`:
+
+```bash
+s3mirror --config config.yaml
+```
+
+This time nothing needs copying, and the object that exists only at the destination goes:
+
+```text title="Output, the app-data section"
+======================================================================
+[1/2]: app-data
+======================================================================
+  Source: 4 objects
+  Destination: 5 objects
+  Actions: 0 to copy (0.0B), 1 to delete
+  ✓ Deleted 1 objects in 0.0s
+  ✓ Bucket completed in 0.0s
+```
+
+At the normal log level s3mirror only reports how many objects it deleted. Run with `--debug` or
+`--log-file` to get each key.
+
+:::caution[Check before the first deleting run]
+Deletion is on by default, and it removes anything at the destination that isn't in the source,
+including objects someone put there on purpose. Before the first run that's allowed to delete, read
+[Deletion](/s3mirror/how-it-works/deletion/), exclude any bucket that only the destination should
+have, and keep an independent copy of anything you can't lose.
+:::
+
+## Next steps
+
+<Steps>
+
+1. Give s3mirror credentials that can only do what the mirror needs.
+   [Safety](/s3mirror/how-it-works/safety/) lists the permissions each side uses.
+
+2. Set the options you care about in the config, such as `exclude_buckets` or a lower
+   `max_workers`. [Configuration](/s3mirror/guides/configuration/) walks through the file.
+
+3. Schedule it with `--log-file`, and alert when it exits with anything other than 0.
+   [Scheduling](/s3mirror/guides/scheduling/) has cron and systemd examples.
+
+</Steps>
+
+<NextSteps
+  links={[
+    { title: "Change detection", href: "/s3mirror/how-it-works/change-detection/", description: "Why an object is copied or skipped, and what a key-and-size comparison misses." },
+    { title: "Deletion", href: "/s3mirror/how-it-works/deletion/", description: "What gets removed from the destination, and the cases where that surprises people." },
+    { title: "Config keys", href: "/s3mirror/reference/configuration/", description: "Every key in the four sections, with its default." },
+    { title: "Exit codes", href: "/s3mirror/reference/exit-codes/", description: "What 0, 1, 2 and 130 mean, and what doesn't count as an error." },
+  ]}
+/>

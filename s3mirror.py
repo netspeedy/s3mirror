@@ -720,7 +720,7 @@ def load_config(config_path: Optional[str]) -> dict:
                 user_config = yaml.safe_load(file)
             else:
                 print(
-                    "Error: Unsupported config format. Use .json or .yaml",
+                    "Error: Unsupported config format. Use .yaml, .yml or .json",
                     file=sys.stderr,
                 )
                 sys.exit(1)
@@ -761,27 +761,27 @@ def positive_int(value: str) -> int:
     return parsed
 
 
-def parse_arguments() -> argparse.Namespace:
-    """Parse command-line arguments."""
+def build_parser() -> argparse.ArgumentParser:
+    """Build the command-line parser, without parsing anything."""
     parser = argparse.ArgumentParser(
         description="S3 Bucket Mirror - Professional bucket synchronization",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Normal operation (console output)
-  %(prog)s
+  %(prog)s --config /etc/s3mirror.yaml
+
+  # Try it first without deleting anything, showing every decision
+  %(prog)s --config /etc/s3mirror.yaml --no-delete --debug
 
   # Silent mode for cron
-  %(prog)s --quiet
+  %(prog)s --config /etc/s3mirror.yaml --quiet
 
-  # Log to file (console is quiet, all output to file)
-  %(prog)s --log-file /var/log/s3mirror.log
+  # Log to file (only errors on the console, everything in the file)
+  %(prog)s --config /etc/s3mirror.yaml --log-file /var/log/s3mirror.log
 
   # Log to file with debug console output too
-  %(prog)s --debug --log-file /var/log/s3mirror.log
-
-  # Use custom config file
-  %(prog)s --config /etc/s3mirror.yaml --log-file /var/log/s3mirror.log
+  %(prog)s --config /etc/s3mirror.yaml --debug --log-file /var/log/s3mirror.log
         """,
     )
 
@@ -789,7 +789,7 @@ Examples:
         "-c",
         "--config",
         metavar="FILE",
-        help="Configuration file path (.json or .yaml)",
+        help="Configuration file path (.yaml, .yml or .json)",
     )
     parser.add_argument(
         "-q",
@@ -807,14 +807,14 @@ Examples:
         "-l",
         "--log-file",
         metavar="FILE",
-        help="Log to file (console quiet unless --debug specified)",
+        help="Log to file (console shows only errors unless --debug specified)",
     )
     parser.add_argument(
         "-w",
         "--workers",
         type=positive_int,
         metavar="N",
-        help="Number of parallel workers (default: 20)",
+        help="Number of parallel workers (default: max_workers, 20 if unset)",
     )
     parser.add_argument(
         "--no-delete",
@@ -832,7 +832,12 @@ Examples:
         version=f"S3 Mirror v{__version__}",
     )
 
-    return parser.parse_args()
+    return parser
+
+
+def parse_arguments() -> argparse.Namespace:
+    """Parse command-line arguments."""
+    return build_parser().parse_args()
 
 
 def main():

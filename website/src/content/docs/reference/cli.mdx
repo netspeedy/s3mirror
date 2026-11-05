@@ -1,0 +1,111 @@
+---
+title: CLI
+description: Every s3mirror flag, with its default and exactly what it changes.
+---
+
+import FlagTable from "../../../components/FlagTable.astro";
+
+export const runOptions = [
+  { short: "-c", flag: "--config", arg: "FILE", description: "Config file to read, `.yaml`, `.yml` or `.json`. Without it, s3mirror runs on its built-in placeholders, which fail the connection check, so in practice every run needs it." },
+  { short: "-w", flag: "--workers", arg: "N", default: "max_workers", description: "Objects to copy, and later delete, at the same time, overriding `max_workers` (20 unless the config sets it). Must be a whole number of at least 1." },
+  { flag: "--no-delete", description: "Don't delete destination objects the source doesn't have, whatever `delete_extraneous` says. The run copies and reports, nothing more." },
+];
+
+export const outputOptions = [
+  { short: "-q", flag: "--quiet", description: "Print only error lines on the console. Wins over `--debug` when both are given." },
+  { short: "-d", flag: "--debug", description: "Print everything on the console, each line prefixed with its level: every listing, comparison, copy and deletion. With `--log-file`, keeps the console at debug instead of errors only." },
+  { short: "-l", flag: "--log-file", arg: "FILE", description: "Append a full debug log, with timestamps, to this file, and print only error lines on the console unless `--debug` is also given. The directory must already exist." },
+];
+
+export const otherOptions = [
+  { flag: "--show-config", description: "Print the configuration the run would use as JSON, after `--workers` and `--no-delete` are applied and with both secret keys redacted, then exit 0 without connecting." },
+  { flag: "--version", description: "Print the version, such as `S3 Mirror v1.0.4`, then exit 0." },
+  { short: "-h", flag: "--help", description: "Print usage and the flags, then exit 0." },
+];
+
+## Usage
+
+```bash
+s3mirror [-c FILE] [-w N] [--no-delete] [-q] [-d] [-l FILE]
+s3mirror -c FILE --show-config
+s3mirror --version
+```
+
+s3mirror takes no positional arguments; everything it mirrors is in the config file. Each run
+mirrors every source bucket that isn't excluded, and there are no flags to pick buckets, prefixes
+or objects.
+
+## Running
+
+<FlagTable flags={runOptions} />
+
+## Output
+
+<FlagTable flags={outputOptions} />
+
+These three only change where output goes and how much of it there is. [Logging](/s3mirror/reference/logging/)
+has the console level for every combination and the format of each destination.
+
+## Other
+
+<FlagTable flags={otherOptions} />
+
+## Flags and the config
+
+Only two settings can be changed from the command line, and both win over the config for that run:
+`--workers` sets `performance.max_workers`, and `--no-delete` sets `sync.delete_extraneous` to
+`false`. Everything else, including the endpoints and `exclude_buckets`, comes from the file.
+
+## Errors
+
+An unknown flag, a missing value or a `--workers` value that isn't a positive whole number prints
+usage and the problem to standard error and exits 2, before anything else happens:
+
+```text title="Output"
+usage: s3mirror [-h] [-c FILE] [-q] [-d] [-l FILE] [-w N] [--no-delete]
+                [--show-config] [--version]
+s3mirror: error: argument -w/--workers: must be greater than zero
+```
+
+[Exit codes](/s3mirror/reference/exit-codes/) has every code s3mirror exits with.
+
+## `--help`
+
+```text title="Output"
+usage: s3mirror [-h] [-c FILE] [-q] [-d] [-l FILE] [-w N] [--no-delete]
+                [--show-config] [--version]
+
+S3 Bucket Mirror - Professional bucket synchronization
+
+options:
+  -h, --help           show this help message and exit
+  -c, --config FILE    Configuration file path (.yaml, .yml or .json)
+  -q, --quiet          Quiet mode - only errors (for cron)
+  -d, --debug          Debug mode - verbose output
+  -l, --log-file FILE  Log to file (console shows only errors unless --debug
+                       specified)
+  -w, --workers N      Number of parallel workers (default: max_workers, 20 if
+                       unset)
+  --no-delete          Don't delete extraneous files from destination
+  --show-config        Display configuration and exit
+  --version            show program's version number and exit
+
+Examples:
+  # Normal operation (console output)
+  s3mirror --config /etc/s3mirror.yaml
+
+  # Try it first without deleting anything, showing every decision
+  s3mirror --config /etc/s3mirror.yaml --no-delete --debug
+
+  # Silent mode for cron
+  s3mirror --config /etc/s3mirror.yaml --quiet
+
+  # Log to file (only errors on the console, everything in the file)
+  s3mirror --config /etc/s3mirror.yaml --log-file /var/log/s3mirror.log
+
+  # Log to file with debug console output too
+  s3mirror --config /etc/s3mirror.yaml --debug --log-file /var/log/s3mirror.log
+        
+```
+
+From a checkout, or in the container, the program name in the help is `s3mirror.py`.

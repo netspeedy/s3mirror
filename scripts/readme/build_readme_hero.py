@@ -12,7 +12,8 @@ drawn in dots, joined by parallel worker lanes, with objects in flight at differ
 one multipart upload among them, and a ping wherever an object lands.
 
 Edit the copy, layout or timing here and run `make readme-hero` rather than editing the
-generated SVG. netspeedy/homebrew-s3mirror shows the same banner, built from a copy of this
+generated SVG. The same run writes the social cards and, when there's a website/, the site's
+mark and icons. netspeedy/homebrew-s3mirror shows the same banner, built from a copy of this
 script in its .github/scripts, so copy changes there too. The headline is positioned from
 measured advances (see ADVANCE); if you change its words, measure them again with
 measure_headline.py. Inter and JetBrains Mono (SIL Open Font License 1.1) are the Google
@@ -32,6 +33,7 @@ import math
 import os
 import random
 import shutil
+import struct
 import subprocess
 import tempfile
 import urllib.request
@@ -46,8 +48,9 @@ OUTPUT = ROOT / "assets" / "s3mirror-readme-hero.svg"
 # assets.netspeedy.io's Cloudflare zone turns away urllib's default user agent.
 USER_AGENT = "netspeedy-readme-hero"
 
-# The website's palette (website/style.css) and the favicon's cyan-violet-orange bucket,
-# with the same inks as the s3ctl hero so the netspeedy banners read as one family.
+# The brand palette: the mark's cyan-violet-orange bucket, with the same inks as the s3ctl
+# hero so the netspeedy banners read as one family. The docs site's theme
+# (website/src/styles/theme.css) takes its colours from here.
 BG = "#060B13"
 INK = "#F1F5FA"
 INK_2 = "#B5C0CD"
@@ -337,20 +340,56 @@ def starfield(
     return defs, body
 
 
+# The mark: a bucket's rim and body in the cyan-violet-orange gradient, and the arrow going
+# into it, on a dark tile. The README banner, the site's header mark and its icons all draw it
+# from these.
+MARK_RIM = "M14 18c0-4 8-7 18-7s18 3 18 7-8 7-18 7-18-3-18-7Z"
+MARK_BODY = "M14 18v20c0 4 8 7 18 7s18-3 18-7V18"
+MARK_ARROW = "M22 32h19m0 0-6-6m6 6-6 6"
+MARK_ARROW_INK = "#F5F8FC"
+MARK_STOPS = [("0", "#29C7FF"), ("0.5", VIOLET), ("1", ORANGE)]
+MARK_GRADIENT = 'x1="10" y1="12" x2="54" y2="54" gradientUnits="userSpaceOnUse"'
+TILE = "#0B1018"
+
+
+def mark_gradient(gradient_id: str) -> str:
+    stops = "".join(
+        (
+            f'<stop stop-color="{colour}" />'
+            if offset == "0"
+            else f'<stop offset="{offset}" stop-color="{colour}" />'
+        )
+        for offset, colour in MARK_STOPS
+    )
+    return (
+        f'<linearGradient id="{gradient_id}" {MARK_GRADIENT}>{stops}</linearGradient>'
+    )
+
+
+def mark_paths(gradient_id: str, arrow: str = MARK_ARROW_INK) -> str:
+    return (
+        f'<path d="{MARK_RIM}" fill="none" stroke="url(#{gradient_id})" stroke-width="4" />'
+        f'<path d="{MARK_BODY}" fill="none" stroke="url(#{gradient_id})" stroke-width="4" '
+        'stroke-linecap="round" />'
+        f'<path d="{MARK_ARROW}" fill="none" stroke="{arrow}" stroke-width="4" '
+        'stroke-linecap="round" stroke-linejoin="round" />'
+    )
+
+
 def mark_symbols() -> list[str]:
-    """The bucket and arrow from website/favicon.svg, without its tile."""
+    """The s3mirror mark, without its tile."""
     return [
         *gradient(
             "linearGradient",
-            'id="markStroke" x1="10" y1="12" x2="54" y2="54" gradientUnits="userSpaceOnUse"',
-            [("0", "#29C7FF", ""), ("0.5", VIOLET, ""), ("1", ORANGE, "")],
+            f'id="markStroke" {MARK_GRADIENT}',
+            [(offset, colour, "") for offset, colour in MARK_STOPS],
         ),
         '    <symbol id="mark" viewBox="0 0 64 64">',
-        '      <path d="M14 18c0-4 8-7 18-7s18 3 18 7-8 7-18 7-18-3-18-7Z" fill="none" '
+        f'      <path d="{MARK_RIM}" fill="none" '
         'stroke="url(#markStroke)" stroke-width="4" />',
-        '      <path d="M14 18v20c0 4 8 7 18 7s18-3 18-7V18" fill="none" '
+        f'      <path d="{MARK_BODY}" fill="none" '
         'stroke="url(#markStroke)" stroke-width="4" stroke-linecap="round" />',
-        '      <path d="M22 32h19m0 0-6-6m6 6-6 6" fill="none" stroke="#F5F8FC" '
+        f'      <path d="{MARK_ARROW}" fill="none" stroke="{MARK_ARROW_INK}" '
         'stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />',
         "    </symbol>",
     ]
@@ -358,7 +397,7 @@ def mark_symbols() -> list[str]:
 
 def lockup() -> list[str]:
     return [
-        '  <rect x="48.5" y="38.5" width="33" height="33" rx="8" fill="#0B1018" '
+        f'  <rect x="48.5" y="38.5" width="33" height="33" rx="8" fill="{TILE}" '
         'stroke="#3B4A5F" stroke-width="1.2" />',
         '  <use href="#mark" x="49" y="39" width="32" height="32" />',
         f'  <text class="sans" x="94" y="52.5" font-size="15" font-weight="600" '
@@ -835,15 +874,18 @@ def build_social_svg(hero: str, width: int, height: int) -> str:
     return ET.tostring(card, encoding="unicode") + "\n"
 
 
-def render_png(svg_path: Path, png_path: Path, width: int, height: int) -> None:
-    """Screenshot the card in headless Chrome, which renders the embedded fonts exactly."""
+def render_png(
+    svg_path: Path, png_path: Path, width: int, height: int, transparent: bool = False
+) -> None:
+    """Screenshot an SVG in headless Chrome, which renders the embedded fonts exactly."""
     chrome = os.environ.get("CHROME") or next(
         (c for c in CHROME_CANDIDATES if Path(c).exists() or shutil.which(c)), None
     )
     if not chrome:
         raise SystemExit(
-            "the social cards need Chrome or Chromium to render; set CHROME"
+            "the social cards and icons need Chrome or Chromium to render; set CHROME"
         )
+    background = ["--default-background-color=00000000"] if transparent else []
     with tempfile.TemporaryDirectory() as profile:
         subprocess.run(
             [
@@ -851,6 +893,7 @@ def render_png(svg_path: Path, png_path: Path, width: int, height: int) -> None:
                 "--headless=new",
                 "--disable-gpu",
                 "--hide-scrollbars",
+                *background,
                 f"--user-data-dir={profile}",
                 f"--window-size={width},{height}",
                 f"--screenshot={png_path}",
@@ -878,6 +921,75 @@ def write_social_cards(hero: str) -> None:
         print(f"Wrote {png.relative_to(ROOT)} ({width}x{height})")
 
 
+# Written into the website, so they're only made when the repo has one. The header mark draws its
+# arrow in currentColor, so the page's theme can colour it; the favicon is the mark on its tile;
+# the Apple touch icon fills its square because iOS rounds the corners itself; and favicon.ico
+# carries 16, 32 and 48 px PNGs for clients that ignore the SVG.
+ICON_DIR = ROOT / "website" / "public"
+SITE_MARK = ROOT / "website" / "src" / "assets" / "mark.svg"
+
+
+def icon_svg(size: int | None = None, square: bool = False) -> str:
+    dims = f' width="{size}" height="{size}"' if size else ""
+    radius = 0 if square else 12
+    inset = (
+        '<g transform="translate(6.4 6.4) scale(0.8)">' + mark_paths("g") + "</g>"
+        if square
+        else mark_paths("g")
+    )
+    return (
+        f'<svg xmlns="{SVG_NS}" viewBox="0 0 64 64"{dims}><title>s3mirror</title>'
+        f"<defs>{mark_gradient('g')}</defs>"
+        f'<rect width="64" height="64" rx="{radius}" fill="{TILE}" />{inset}</svg>\n'
+    )
+
+
+def ico(images: list[tuple[int, bytes]]) -> bytes:
+    """An ICO file holding PNG images, which every current client reads."""
+    header = struct.pack("<HHH", 0, 1, len(images))
+    entries, data = b"", b""
+    offset = 6 + 16 * len(images)
+    for size, png in images:
+        entries += struct.pack(
+            "<BBBBHHII", size % 256, size % 256, 0, 0, 1, 32, len(png), offset
+        )
+        data += png
+        offset += len(png)
+    return header + entries + data
+
+
+def write_icons() -> None:
+    if not (ROOT / "website").is_dir():
+        return
+    SITE_MARK.parent.mkdir(parents=True, exist_ok=True)
+    SITE_MARK.write_text(
+        f'<svg xmlns="{SVG_NS}" viewBox="0 0 64 64" aria-hidden="true" focusable="false">'
+        f"<defs>{mark_gradient('ns-mark-g')}</defs>"
+        f"{mark_paths('ns-mark-g', 'currentColor')}</svg>\n",
+        encoding="utf-8",
+    )
+    print(f"Wrote {SITE_MARK.relative_to(ROOT)}")
+    ICON_DIR.mkdir(parents=True, exist_ok=True)
+    favicon = ICON_DIR / "favicon.svg"
+    favicon.write_text(icon_svg(), encoding="utf-8")
+    print(f"Wrote {favicon.relative_to(ROOT)}")
+    with tempfile.TemporaryDirectory() as tmp:
+        work = Path(tmp)
+
+        def png(size: int, square: bool = False) -> bytes:
+            src, out = work / f"icon-{size}.svg", work / f"icon-{size}.png"
+            src.write_text(icon_svg(size, square), encoding="utf-8")
+            render_png(src, out, size, size, transparent=not square)
+            return out.read_bytes()
+
+        touch = ICON_DIR / "apple-touch-icon.png"
+        touch.write_bytes(png(180, square=True))
+        print(f"Wrote {touch.relative_to(ROOT)} (180x180)")
+        fallback = ICON_DIR / "favicon.ico"
+        fallback.write_bytes(ico([(16, png(16)), (32, png(32)), (48, png(48))]))
+        print(f"Wrote {fallback.relative_to(ROOT)} (16, 32 and 48 px)")
+
+
 def main() -> None:
     hero = build_svg()
     svg = hero.replace("__FONT_FACES__", font_faces(hero))
@@ -888,6 +1000,7 @@ def main() -> None:
     OUTPUT.write_text(svg, encoding="utf-8")
     print(f"Wrote {OUTPUT.relative_to(ROOT)} ({len(svg.encode()) / 1024:.1f} KiB)")
     write_social_cards(hero)
+    write_icons()
 
 
 if __name__ == "__main__":

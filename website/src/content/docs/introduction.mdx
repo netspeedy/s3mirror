@@ -1,0 +1,69 @@
+---
+title: Introduction
+description: What s3mirror does in a run, what it compares, and what it leaves alone.
+---
+
+import { Steps } from "@astrojs/starlight/components";
+import NextSteps from "../../components/NextSteps.astro";
+
+s3mirror copies buckets and objects from one S3-compatible endpoint to another: AWS S3, MinIO,
+Ceph, Wasabi, Backblaze B2 or anything else that speaks the S3 API. It finds every bucket on the
+source, creates any that are missing at the destination, and copies the objects that are new or
+whose size has changed. With deletion on, which is the default, it also removes objects that exist
+only at the destination, so each destination bucket ends up matching its source.
+
+It's one Python script built on `boto3`, with one config file that names both endpoints. There's
+no daemon and no state between runs: each run lists both sides again and works out what to do from
+scratch, which makes it easy to run from cron, a systemd timer or a CI job. The exit code tells the
+scheduler whether the run counted any errors.
+
+## How a run works
+
+<Steps>
+
+1. It lists the buckets on both endpoints, to check it can reach and authenticate to each. If
+   either listing fails, it stops with exit code 1 before touching anything.
+
+2. It takes the source's buckets, minus any you've excluded by name, and handles them one at a
+   time in the order the source lists them.
+
+3. For each bucket, it creates the bucket at the destination if it isn't there, then lists the
+   objects on both sides and compares them by key and size.
+
+4. It copies every object that's missing at the destination or has a different size, up to 20 at
+   a time by default. Each copy streams from the source through the machine running s3mirror to
+   the destination.
+
+5. If deletion is on, it then deletes every object in the destination bucket whose key the source
+   doesn't have.
+
+6. It prints a summary of buckets, objects and bytes, and exits 0 if it counted no errors or 1 if
+   it did.
+
+</Steps>
+
+## What it doesn't do
+
+s3mirror only looks at keys and sizes. Two objects with the same key and the same size count as in
+sync even if their contents differ, and it never copies metadata, tags, ACLs, storage classes,
+retention settings or older versions. [Change detection](/s3mirror/how-it-works/change-detection/)
+has the full list.
+
+It only mirrors in one direction and only the buckets the source has. Buckets that exist only at
+the destination are never listed, changed or deleted, and it doesn't copy bucket settings such as
+policies, lifecycle rules or versioning.
+
+It isn't a backup. A mirror with deletion on reproduces the source's deletions as well as its new
+objects, so anything removed from the source goes from the destination on the next run.
+[Deletion](/s3mirror/how-it-works/deletion/) covers exactly what gets removed and when.
+
+## Where next
+
+<NextSteps
+  links={[
+    { title: "Quickstart", href: "/s3mirror/quickstart/", description: "Install s3mirror, write a config and run a first, copy-only mirror." },
+    { title: "How mirroring works", href: "/s3mirror/how-it-works/", description: "One run step by step, and what decides each copy and deletion." },
+    { title: "Safety", href: "/s3mirror/how-it-works/safety/", description: "Credentials, TLS and the checks to make before you let it delete." },
+    { title: "CLI", href: "/s3mirror/reference/cli/", description: "Every flag, and how each one changes a run." },
+  ]}
+/>
