@@ -273,20 +273,29 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
         self.logger.debug("Total buckets to sync: %d", len(buckets))
         return buckets
 
-    def bucket_exists(self, bucket_name: str) -> bool:
-        """Check if bucket exists on destination."""
+    def bucket_exists(self, bucket_name: str) -> Optional[bool]:
+        """Check whether the bucket exists on the destination.
+
+        Only a 404 means it doesn't. Anything else, such as a 403 for a bucket the
+        credential can't see, returns None, because creating a bucket on the strength
+        of it would be a guess.
+        """
         try:
             self.dest_client.head_bucket(Bucket=bucket_name)
             return True
-        except botocore.exceptions.ClientError:
-            return False
+        except botocore.exceptions.ClientError as err:
+            error = err.response.get("Error", {})
+            status = err.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+            if status == 404 or error.get("Code") in {"404", "NoSuchBucket"}:
+                return False
+            self.logger.error("  ✗ Failed to check bucket on destination: %s", err)
+            return None
+        except botocore.exceptions.BotoCoreError as err:
+            self.logger.error("  ✗ Failed to check bucket on destination: %s", err)
+            return None
 
     def create_bucket(self, bucket_name: str) -> bool:
-        """Create bucket on destination if missing."""
-        if self.bucket_exists(bucket_name):
-            self.logger.debug("  Bucket already exists on destination")
-            return True
-
+        """Create bucket on destination."""
         try:
             self.logger.debug("  Creating bucket on destination...")
             self.dest_client.create_bucket(Bucket=bucket_name)
@@ -522,7 +531,15 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
         bucket_start = time.time()
 
         self.logger.debug("  Checking if bucket exists on destination...")
-        if not self.create_bucket(bucket_name):
+        exists = self.bucket_exists(bucket_name)
+        if exists is None:
+            self.logger.warning("  Skipping bucket due to HeadBucket failure")
+            self.stats["buckets_skipped"] += 1
+            self.stats["errors"] += 1
+            return
+        if exists:
+            self.logger.debug("  Bucket already exists on destination")
+        elif not self.create_bucket(bucket_name):
             self.logger.warning("  Skipping bucket due to creation failure")
             self.stats["buckets_skipped"] += 1
             return

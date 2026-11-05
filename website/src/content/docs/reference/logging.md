@@ -88,14 +88,15 @@ counts on each side, the `Actions:` line, the copy and delete totals with their 
 
 **Warning** marks a risk or something that didn't happen:
 `⚠ TLS certificate verification is off for the source` (or `destination`),
-`No buckets found to sync`, `Skipping bucket due to creation failure` or `due to listing failure`,
-`⚠ N objects failed to copy` or `failed to delete`, `⚠ Errors encountered: N` in the summary, and
-`Operation cancelled by user (Ctrl+C)`.
+`No buckets found to sync`, `Skipping bucket due to HeadBucket failure`, `due to creation failure`
+or `due to listing failure`, `⚠ N objects failed to copy` or `failed to delete`,
+`⚠ Errors encountered: N` in the summary, and `Operation cancelled by user (Ctrl+C)`.
 
 **Error** is a failed call: the connection check (`✗ Source connection FAILED` with the error code,
-message and HTTP status), `Failed to list source buckets`, `Failed to create bucket`,
-`Failed to list objects in <bucket> on the source` or `on the destination`, `Failed to copy <key>`,
-`Failed to delete <key>`, and `FATAL ERROR` with a traceback for anything unexpected.
+message and HTTP status), `Failed to list source buckets`, `Failed to check bucket on destination`,
+`Failed to create bucket`, `Failed to list objects in <bucket> on the source` or
+`on the destination`, `Failed to copy <key>`, `Failed to delete <key>`, and `FATAL ERROR` with a
+traceback for anything unexpected.
 
 **Debug** adds the detail: the settings in use with access keys shortened to their first and last
 four characters, a sample of the source's bucket names, each listing's object count, page count and
@@ -128,8 +129,8 @@ Average throughput: 36.6MB/s
 ```
 
 `Processed` counts buckets that got as far as the comparison, whatever happened to their copies.
-A `Skipped` line appears when a bucket couldn't be created or listed, `Average throughput` only when something
-was copied, and with any errors the status line becomes `⚠ Errors encountered: N` followed by
+A `Skipped` line appears when a bucket couldn't be checked, created or listed, `Average throughput`
+only when something was copied, and with any errors the status line becomes `⚠ Errors encountered: N` followed by
 `Status: COMPLETED WITH ERRORS`. A run stopped by Ctrl+C or a fatal error prints no summary.
 
 Sizes are in powers of 1024 with `B`, `KB`, `MB`, `GB` and `TB` labels. Durations under a minute
