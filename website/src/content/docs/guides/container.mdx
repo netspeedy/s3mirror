@@ -124,11 +124,16 @@ Pair it with the timer on the Scheduling page. Use the UID and GID that own `/va
 
 ## Stopping it
 
-s3mirror runs as process 1 in the container and doesn't handle `SIGTERM`, and Linux ignores a signal
-that process 1 has no handler for. So `docker stop` waits out its timeout, 10 seconds by default,
-and then kills the container, which exits 137. With `--init`, as in the unit above, a small init
-process passes `SIGTERM` on and s3mirror stops at once. Either way it stops mid-run without a
-summary; the next run picks up where it left off.
+`docker stop` sends `SIGTERM`, which s3mirror handles even as process 1 in the container. It drops
+the copies or deletions still queued for the current bucket, waits for the ones already running,
+logs `Operation stopped by SIGTERM` and exits 143 without a summary. The next run picks up where it
+left off.
 
-Ctrl+C on an attached `docker run` is passed on as `SIGINT`, which s3mirror does handle: it waits
-for the copies or deletions already queued for the current bucket, then exits 130 without a summary.
+`docker stop` only waits 10 seconds by default before it kills the container, which then exits 137,
+and a large object in flight can take longer than that. Give it more time with `docker stop -t 300`,
+or `--stop-timeout 300` on `docker run`. The `--init` in the unit above isn't needed for any of this,
+but does no harm.
+
+Ctrl+C on an attached `docker run` is passed on as `SIGINT`, which stops it the same way and exits
+130. A second Ctrl+C, or a second `SIGTERM`, stops at once without waiting for the transfers in
+progress.

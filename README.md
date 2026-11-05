@@ -277,9 +277,11 @@ s3mirror --config /etc/s3mirror.yaml --log-file /var/log/s3mirror.log --quiet
 Each run starts the log file with a session header, so it can be tailed or rotated
 by other tools. s3mirror exits `0` when the run finishes without errors and `1`
 when anything went wrong, including a bad config or an endpoint it can't reach. A
-bad flag or flag value exits `2` before anything runs, and Ctrl+C exits `130`. Alert
-on any non-zero exit code. The final summary reports buckets processed and created, objects
-copied and deleted, data transferred, average throughput and the error count.
+bad flag or flag value exits `2` before anything runs. Ctrl+C exits `130` and
+`SIGTERM`, from `kill`, `systemctl stop` or `docker stop`, exits `143`: both let the
+transfers already running finish and drop the rest. Alert on any non-zero exit code.
+The final summary reports buckets processed and created, objects copied and
+deleted, data transferred, average throughput and the error count.
 
 | Mode | Console | Log file | Typical use |
 |------|---------|----------|-------------|

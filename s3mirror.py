@@ -15,9 +15,12 @@ Features:
 import argparse
 import json
 import logging
+import os
+import signal
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
@@ -85,6 +88,34 @@ def part_size_for(object_size: int, configured: int) -> int:
     if needed > part_size:
         part_size = -(-needed // 1024**2) * 1024**2
     return min(part_size, MAX_PART_SIZE)
+
+
+class StopRequested(BaseException):
+    """Raised in the main thread by SIGINT or SIGTERM, to stop the run.
+
+    It's a BaseException, like KeyboardInterrupt, so the `except Exception` handlers
+    that turn a failed call into a logged error don't swallow it.
+    """
+
+    def __init__(self, signum: int):
+        super().__init__(signum)
+        self.signum = signum
+
+
+def _stop_on_signal(signum, _frame):
+    # Stop cleanly on the first signal. A second one, while the transfers already
+    # running are finishing, stops at once.
+    signal.signal(signal.SIGINT, _stop_now)
+    signal.signal(signal.SIGTERM, _stop_now)
+    raise StopRequested(signum)
+
+
+def _stop_now(signum, _frame):
+    logging.getLogger("s3mirror").warning(
+        "Stopping now, without waiting for the transfers in progress"
+    )
+    logging.shutdown()
+    os._exit(128 + signum)  # pylint: disable=protected-access
 
 
 class ColoredFormatter(logging.Formatter):
@@ -187,6 +218,26 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
             use_threads=True,
             max_io_queue=1000,
         )
+
+    @contextmanager
+    def _workers(self):
+        """A thread pool that drops the work still queued when the run is stopped.
+
+        On Ctrl+C or SIGTERM the transfers already running are left to finish, so
+        none is cut off halfway, and the rest are cancelled.
+        """
+        executor = ThreadPoolExecutor(max_workers=self.max_workers)
+        try:
+            yield executor
+        except BaseException as err:
+            if isinstance(err, (StopRequested, KeyboardInterrupt)):
+                self.logger.warning(
+                    "  Stopping: dropping the queued work and waiting for the "
+                    "transfers already running"
+                )
+            executor.shutdown(wait=True, cancel_futures=True)
+            raise
+        executor.shutdown(wait=True)
 
     def _create_client(self, endpoint_config: dict, label: str):
         boto_config = Config(
@@ -533,7 +584,7 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
         success = 0
         failed = 0
 
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+        with self._workers() as executor:
             futures = {
                 executor.submit(self.copy_object, bucket_name, key, size): (key, size)
                 for key, size in to_copy
@@ -648,7 +699,7 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
             success_del = 0
             failed_del = 0
 
-            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            with self._workers() as executor:
                 futures = {
                     executor.submit(self.delete_object, bucket_name, key): key
                     for key in to_delete
@@ -1034,6 +1085,13 @@ def main():
     for label in unverified:
         logger.warning("⚠ TLS certificate verification is off for the %s", label)
 
+    # SIGTERM, from kill, systemctl stop or docker stop, is handled like Ctrl+C.
+    # Without a handler it ends the run mid-transfer, and in a container, where
+    # s3mirror is process 1, the kernel ignores it altogether.
+    previous = {
+        signum: signal.signal(signum, _stop_on_signal)
+        for signum in (signal.SIGINT, signal.SIGTERM)
+    }
     try:
         mirror = S3Mirror(config, logger)
 
@@ -1046,12 +1104,19 @@ def main():
 
         sys.exit(1 if mirror.stats["errors"] > 0 else 0)
 
-    except KeyboardInterrupt:
-        logger.warning("\n\nOperation cancelled by user (Ctrl+C)")
-        sys.exit(130)
+    except (StopRequested, KeyboardInterrupt) as stop:
+        signum = getattr(stop, "signum", signal.SIGINT)
+        if signum == signal.SIGINT:
+            logger.warning("\n\nOperation cancelled by user (Ctrl+C)")
+        else:
+            logger.warning("Operation stopped by %s", signal.Signals(signum).name)
+        sys.exit(128 + signum)
     except Exception as err:  # pylint: disable=broad-except
         logger.exception("FATAL ERROR: %s", err)
         sys.exit(1)
+    finally:
+        for signum, handler in previous.items():
+            signal.signal(signum, handler)
 
 
 if __name__ == "__main__":

@@ -118,7 +118,7 @@
   workflow checks 3.11 to 3.14; the image is built on `python:3.15-slim`.
 - Keep exit codes stable: 0 for a run with no counted errors, 1 for counted
   errors, a failed connection check, a config problem or a fatal error, 2 for a
-  usage error, 130 for Ctrl+C. Schedulers alert on them.
+  usage error, 130 for Ctrl+C and 143 for SIGTERM. Schedulers alert on them.
 - Never log or print secret keys. Debug output shortens access key IDs with
   `_redact`, and `--show-config` redacts both secret keys.
 - Deletion is the dangerous part. A change that affects what gets deleted, or

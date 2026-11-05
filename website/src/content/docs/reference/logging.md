@@ -90,7 +90,8 @@ counts on each side, the `Actions:` line, the copy and delete totals with their 
 `⚠ TLS certificate verification is off for the source` (or `destination`),
 `No buckets found to sync`, `Skipping bucket due to HeadBucket failure`, `due to creation failure`
 or `due to listing failure`, `⚠ N objects failed to copy` or `failed to delete`,
-`⚠ Errors encountered: N` in the summary, and `Operation cancelled by user (Ctrl+C)`.
+`⚠ Errors encountered: N` in the summary, `Stopping: dropping the queued work ...`,
+`Operation cancelled by user (Ctrl+C)` and `Operation stopped by SIGTERM`.
 
 **Error** is a failed call: the connection check (`✗ Source connection FAILED` with the error code,
 message and HTTP status), `Failed to list source buckets`, `Failed to check bucket on destination`,
@@ -133,7 +134,7 @@ Average throughput: 36.6MB/s
 `Processed` counts buckets that got as far as the comparison, whatever happened to their copies.
 A `Skipped` line appears when a bucket couldn't be checked, created or listed, `Average throughput`
 only when something was copied, and with any errors the status line becomes `⚠ Errors encountered: N` followed by
-`Status: COMPLETED WITH ERRORS`. A run stopped by Ctrl+C or a fatal error prints no summary.
+`Status: COMPLETED WITH ERRORS`. A run stopped by Ctrl+C, `SIGTERM` or a fatal error prints no summary.
 
 Sizes are in powers of 1024 with `B`, `KB`, `MB`, `GB` and `TB` labels. Durations under a minute
 are in seconds, under an hour in minutes to one decimal place (`12.5m`), and beyond that in hours

@@ -83,6 +83,11 @@ A failed run leaves the service in the `failed` state, which `systemctl --failed
 monitoring will pick up. Add `OnFailure=` to the `[Unit]` section to run a notification unit as
 well.
 
+`systemctl stop` sends `SIGTERM`. s3mirror lets the transfers already running finish, drops the rest
+and exits 143, which systemd records as a failure, since the run didn't finish. If a large object
+can be in flight, raise `TimeoutStopSec=` (90 seconds by default) in `[Service]`, or systemd kills
+it before the transfer completes.
+
 ## Rotating the log
 
 s3mirror opens the log file when a run starts and closes it when the run ends, so the file can be
