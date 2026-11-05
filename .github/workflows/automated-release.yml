@@ -79,9 +79,11 @@ jobs:
             echo "release_required=true" >> "${GITHUB_OUTPUT}"
           fi
 
-      # Dependency and code changes ship on their own: when release-bearing commits have landed
-      # since the last release and __version__ hasn't moved, bump it here. The pushed commit runs
-      # this workflow again, which then tags the new version and starts the publish workflows.
+      # Automated updates ship on their own: when release-bearing commits have landed since the
+      # last release, all of them from Dependabot, Renovate or this repository's workflows, and
+      # __version__ hasn't moved, bump it here. The pushed commit runs this workflow again, which
+      # tags the new version and starts the publish workflows. A person releases their own change
+      # by bumping __version__ in the pull request.
       - name: Work out whether unreleased changes need a release
         if: steps.existing.outputs.release_required == 'false'
         id: next
@@ -90,8 +92,13 @@ jobs:
             echo "${key}=${value}" >> "${GITHUB_OUTPUT}"
           done < <(bash scripts/release/next-release.sh)
 
-      - name: Bump __version__ on main
+      - name: Check whether the changes are only automated updates
         if: steps.next.outputs.release_required == 'true'
+        id: authors
+        run: bash scripts/release/automated-only.sh "${{ steps.next.outputs.previous_tag }}" HEAD >> "${GITHUB_OUTPUT}"
+
+      - name: Bump __version__ on main
+        if: steps.next.outputs.release_required == 'true' && steps.authors.outputs.automated_only == 'true'
         id: bump
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
@@ -158,6 +165,11 @@ jobs:
           if [ -n "${{ steps.bump.outputs.version }}" ]; then
             printf "Bumped \`__version__\` to \`%s\` for the %s changes since \`%s\`; the run for that commit tags and publishes it.\n" \
               "${{ steps.bump.outputs.version }}" "${{ steps.next.outputs.bump }}" "${tag}" >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+          if [ "${{ steps.authors.outputs.automated_only }}" = "false" ]; then
+            printf "Release tag \`%s\` already exists. %s release-bearing change(s) people merged have landed since, so bump \`__version__\` in a pull request to release them.\n" \
+              "${tag}" "${{ steps.authors.outputs.human_commits }}" >> "${GITHUB_STEP_SUMMARY}"
             exit 0
           fi
           if [ "${{ steps.existing.outputs.release_required }}" != "true" ]; then
