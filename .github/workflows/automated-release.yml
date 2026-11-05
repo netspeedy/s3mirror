@@ -128,8 +128,8 @@ jobs:
           path.write_text(text)
           PY
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "netspeedybot"
+          git config user.email "45371234+netspeedybot@users.noreply.github.com"
           git commit -q -m "chore(release): bump version to ${version}" -- s3mirror.py
           if ! git push "https://x-access-token:${RELEASE_AUTOMATION_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
             "HEAD:refs/heads/${DEFAULT_BRANCH}" 2>push.err; then
@@ -151,8 +151,8 @@ jobs:
 
           tag="${{ steps.version.outputs.tag }}"
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "netspeedybot"
+          git config user.email "45371234+netspeedybot@users.noreply.github.com"
           git tag -a "${tag}" -m "Release ${tag}"
           git push "https://x-access-token:${RELEASE_AUTOMATION_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
             "refs/tags/${tag}"
