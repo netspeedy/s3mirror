@@ -1,0 +1,81 @@
+name: GitHub Release
+
+# Every release tag gets its GitHub release, with notes generated from the pull requests since the
+# release before it. Container Image and Publish Homebrew Formula publish the same tag.
+on:
+  push:
+    tags:
+      - v*
+  workflow_dispatch:
+    inputs:
+      release_ref:
+        description: Release tag to publish the GitHub release for, for example v1.0.4
+        required: true
+        type: string
+
+concurrency:
+  group: github-release-${{ github.event_name == 'workflow_dispatch' && inputs.release_ref || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.release_ref || github.ref_name }}
+
+jobs:
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ env.RELEASE_REF }}
+
+      - name: Check the tag
+        id: tag
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "${RELEASE_REF}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected a release tag like v1.0.4, got: ${RELEASE_REF}" >&2
+            exit 1
+          fi
+          git fetch --tags --force
+          git fetch origin "refs/heads/${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}" --force
+          git merge-base --is-ancestor "$(git rev-parse "${RELEASE_REF}^{commit}")" "refs/remotes/origin/${DEFAULT_BRANCH}"
+
+          echo "previous=$(bash scripts/release/previous-tag.sh "${RELEASE_REF}")" >> "${GITHUB_OUTPUT}"
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIOUS_TAG: ${{ steps.tag.outputs.previous }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "${RELEASE_REF}" >/dev/null 2>&1; then
+            gh release edit "${RELEASE_REF}" --draft=false --latest
+            printf "Release \`%s\` already existed; marked it published and latest.\n" "${RELEASE_REF}" >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+
+          start=()
+          if [ -n "${PREVIOUS_TAG}" ]; then
+            start=(--notes-start-tag "${PREVIOUS_TAG}")
+          fi
+          gh release create "${RELEASE_REF}" \
+            --verify-tag \
+            --title "s3mirror ${RELEASE_REF}" \
+            --generate-notes "${start[@]}" \
+            --latest
+          printf "Published the GitHub release for \`%s\`, with notes since \`%s\`.\n" \
+            "${RELEASE_REF}" "${PREVIOUS_TAG:-the first commit}" >> "${GITHUB_STEP_SUMMARY}"
