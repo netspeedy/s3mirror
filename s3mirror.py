@@ -82,10 +82,10 @@ def redact_key_id(value):
     That's enough to tell which key is in use without printing the key. On AWS the
     first four only say what kind of key it is (AKIA long-term, ASIA temporary), the
     last four are what `aws configure list` shows, and the twelve in between stay
-    hidden, so the ID can't be used to look up the AWS account it belongs to. A key ID shorter than 20
-    characters is hidden entirely, since four and four would be most of it. null,
-    which hands the side to boto3's credential chain, and the placeholders are left
-    as they are.
+    hidden, so the ID can't be used to look up the AWS account it belongs to. A key
+    ID shorter than 20 characters is hidden entirely, since four and four would be
+    most of it. null, which hands the side to boto3's credential chain, and the
+    placeholders are left as they are.
     """
     if value is None or value in PLACEHOLDER_KEY_IDS:
         return value
