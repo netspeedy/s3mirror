@@ -13,6 +13,7 @@ Features:
 """
 
 import argparse
+import difflib
 import json
 import logging
 import os
@@ -869,7 +870,17 @@ def setup_logging(args: argparse.Namespace) -> logging.Logger:
 
 
 class ConfigError(ValueError):
-    """A config value s3mirror won't run with."""
+    """Config values s3mirror won't run with, one problem per line."""
+
+    def __init__(self, problems):
+        self.problems = [problems] if isinstance(problems, str) else list(problems)
+        super().__init__("\n".join(self.problems))
+
+    def report(self, path) -> str:
+        """The message for standard error: one line, or one line per problem."""
+        if len(self.problems) == 1:
+            return f"Error: Invalid config in {path}: {self.problems[0]}"
+        return "\n  ".join([f"Error: Invalid config in {path}:", *self.problems])
 
 
 def config_bool(value, name: str) -> bool:
@@ -885,32 +896,123 @@ def config_bool(value, name: str) -> bool:
     raise ConfigError(f"{name} must be true or false, not {value!r}")
 
 
+def _unknown_key(name: str, known) -> str:
+    """The problem for a key s3mirror doesn't know, with the likely intended one."""
+    problem = f"{name} isn't a config key"
+    prefix, _, key = name.rpartition(".")
+    match = difflib.get_close_matches(key, sorted(known), n=1)
+    if match:
+        problem += f"; did you mean {prefix + '.' if prefix else ''}{match[0]}?"
+    return problem
+
+
+def _check_endpoint(side: str, section: dict, problems: List[str]) -> None:
+    """Check one side's endpoint and credentials."""
+    for key in ("endpoint_url", "aws_access_key_id", "aws_secret_access_key"):
+        value = section[key]
+        if value is not None and (not isinstance(value, str) or not value.strip()):
+            problems.append(f"{side}.{key} must be a string, or null, not {value!r}")
+    url = section["endpoint_url"]
+    if isinstance(url, str) and not url.lower().startswith(("http://", "https://")):
+        problems.append(
+            f"{side}.endpoint_url must be a URL starting with http:// or https://, "
+            f"not {url!r}"
+        )
+    region = section["region_name"]
+    if region is not None and (not isinstance(region, str) or not region.strip()):
+        problems.append(f"{side}.region_name must be a string, or null, not {region!r}")
+    if (section["aws_access_key_id"] is None) != (
+        section["aws_secret_access_key"] is None
+    ):
+        problems.append(
+            f"{side}.aws_access_key_id and {side}.aws_secret_access_key must both be "
+            "set, or both be null to use boto3's credential chain"
+        )
+
+
+def _check_verify_ssl(side: str, section: dict, problems: List[str]) -> None:
+    """Read verify_ssl: a boolean, the string true or false, or a CA bundle path."""
+    verify = section["verify_ssl"]
+    if isinstance(verify, bool):
+        return
+    expected = f"{side}.verify_ssl must be true, false or the path to a CA bundle"
+    if not isinstance(verify, str) or not verify.strip():
+        problems.append(f"{expected}, not {verify!r}")
+    elif verify.strip().lower() in {"true", "false"}:
+        section["verify_ssl"] = verify.strip().lower() == "true"
+    elif not Path(verify).exists():
+        problems.append(f"{expected}, and {verify!r} doesn't exist")
+
+
+def _check_sync(sync: dict, problems: List[str]) -> None:
+    """Read delete_extraneous strictly and check exclude_buckets is a list of names."""
+    try:
+        sync["delete_extraneous"] = config_bool(
+            sync["delete_extraneous"], "sync.delete_extraneous"
+        )
+    except ConfigError as err:
+        problems.extend(err.problems)
+    buckets = sync["exclude_buckets"]
+    if not isinstance(buckets, list) or not all(
+        isinstance(bucket, str) and bucket for bucket in buckets
+    ):
+        problems.append(
+            f"sync.exclude_buckets must be a list of bucket names, not {buckets!r}"
+        )
+
+
+def _check_sections(config: dict, problems: List[str]) -> Dict[str, dict]:
+    """Check every section and key is one s3mirror knows, returning the mappings."""
+    problems += [
+        _unknown_key(name, DEFAULT_CONFIG)
+        for name in config
+        if name not in DEFAULT_CONFIG
+    ]
+    sections = {}
+    for name, defaults in DEFAULT_CONFIG.items():
+        section = config.get(name)
+        if not isinstance(section, dict):
+            problems.append(f"{name} must be a mapping of keys, not {section!r}")
+            continue
+        sections[name] = section
+        problems += [
+            _unknown_key(f"{name}.{key}", defaults)
+            for key in section
+            if key not in defaults
+        ]
+    return sections
+
+
+def _check_performance(performance: dict, problems: List[str]) -> None:
+    """Every performance value is a count or a size, so a whole number above 0."""
+    for key in DEFAULT_CONFIG["performance"]:
+        value = performance[key]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            problems.append(
+                f"performance.{key} must be a whole number of at least 1, not {value!r}"
+            )
+
+
 def validate_config(config: dict) -> dict:
     """Check the merged config, normalising the values it accepts.
 
-    Raises ConfigError for a value s3mirror would otherwise misread.
+    Raises ConfigError listing every problem, so a config that s3mirror would
+    otherwise misread, ignore part of, or fail on halfway through a run never gets
+    as far as connecting.
     """
-    sync = config.get("sync")
-    if isinstance(sync, dict):
-        sync["delete_extraneous"] = config_bool(
-            sync.get("delete_extraneous"), "sync.delete_extraneous"
-        )
-
+    problems: List[str] = []
+    sections = _check_sections(config, problems)
     for side in ("source", "destination"):
-        section = config.get(side)
-        if not isinstance(section, dict):
-            continue
-        verify = section.get("verify_ssl")
-        if isinstance(verify, bool):
-            continue
-        expected = f"{side}.verify_ssl must be true, false or the path to a CA bundle"
-        if not isinstance(verify, str) or not verify.strip():
-            raise ConfigError(f"{expected}, not {verify!r}")
-        if verify.strip().lower() in {"true", "false"}:
-            section["verify_ssl"] = verify.strip().lower() == "true"
-        elif not Path(verify).exists():
-            raise ConfigError(f"{expected}, and {verify!r} doesn't exist")
+        if side in sections:
+            _check_endpoint(side, sections[side], problems)
+            _check_verify_ssl(side, sections[side], problems)
+    if "performance" in sections:
+        _check_performance(sections["performance"], problems)
+    if "sync" in sections:
+        _check_sync(sections["sync"], problems)
 
+    if problems:
+        raise ConfigError(problems)
     return config
 
 
@@ -962,7 +1064,7 @@ def load_config(config_path: Optional[str]) -> dict:
     try:
         return validate_config(config)
     except ConfigError as err:
-        print(f"Error: Invalid config in {config_path}: {err}", file=sys.stderr)
+        print(err.report(config_path), file=sys.stderr)
         sys.exit(1)
 
 
