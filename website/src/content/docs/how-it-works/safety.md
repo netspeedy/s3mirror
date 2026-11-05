@@ -69,9 +69,15 @@ endpoint.
 Both secret keys live in the config file in plain text. Keep it readable only by the account that
 runs s3mirror (`chmod 600`), and out of version control.
 
-`--show-config` replaces both secret keys with `***REDACTED***`, but prints the access key IDs in
-full. Debug output and log files show only the first and last four characters of each access key
-ID, and never the secret keys.
+The secret keys are never logged, and `--show-config` replaces them with `***REDACTED***`. Access
+key IDs aren't secret in the same way, but they're still worth keeping out of a pasted log or an
+issue: on AWS, anyone with an AWS account of their own can look up which account a full key ID
+belongs to. So debug output, log files and `--show-config` show only the first and last four
+characters, such as `AKIA...MPLE`. That's enough to tell which key is in use: on AWS the first four say what kind of key it is (`AKIA`
+for a long-term key, `ASIA` for a temporary one) and the last four are what `aws configure list`
+shows. A key ID shorter than 20 characters, as MinIO and some other services allow, is shown as
+`***`, because four and four would be most of it. The placeholders, such as `SOURCE_ACCESS_KEY`, are
+shown in full, since they aren't credentials and seeing one means the key was never set.
 
 ## Before a run that can delete
 

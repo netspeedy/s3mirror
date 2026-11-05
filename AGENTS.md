@@ -119,8 +119,9 @@
 - Keep exit codes stable: 0 for a run with no counted errors, 1 for counted
   errors, a failed connection check, a config problem or a fatal error, 2 for a
   usage error, 130 for Ctrl+C and 143 for SIGTERM. Schedulers alert on them.
-- Never log or print secret keys. Debug output shortens access key IDs with
-  `_redact`, and `--show-config` redacts both secret keys.
+- Never log or print secret keys, or access key IDs in full. Debug output and
+  `--show-config` shorten access key IDs with `redact_key_id()`, and
+  `--show-config` redacts both secret keys.
 - Deletion is the dangerous part. A change that affects what gets deleted, or
   when, needs saying plainly in the pull request and a matching update to the
   Deletion page. `--no-delete` must keep winning over the config.

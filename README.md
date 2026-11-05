@@ -141,7 +141,8 @@ export was skipped, and `media-assets` was created and filled. Run it again
 without `--no-delete` and the stray `old-report.csv` is removed as well, because
 deleting destination-only objects is on by default. Add `--debug` to see every
 decision. `--show-config` prints the configuration s3mirror will actually use,
-with the secret keys redacted.
+with the secret keys redacted and the access key IDs shortened to their first and
+last four characters.
 
 Before a real first run:
 
@@ -263,7 +264,7 @@ Flags override the config for a single run.
 | `-q`, `--quiet` | Errors only on the console. |
 | `-d`, `--debug` | Verbose output, including every transfer decision. |
 | `-l`, `--log-file FILE` | Write a full debug log to a file. The console shows only errors unless `--debug` is also set. |
-| `--show-config` | Print the effective configuration with secret keys redacted, then exit. |
+| `--show-config` | Print the effective configuration with the keys redacted, then exit. |
 | `--version` | Print the version and exit. |
 
 ## Running it on a schedule

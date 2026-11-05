@@ -69,6 +69,32 @@ DEFAULT_CONFIG = {
 }
 
 
+# The built-in placeholder key IDs aren't credentials, and seeing one in the output
+# is how a config that never set its keys gets noticed.
+PLACEHOLDER_KEY_IDS = {
+    DEFAULT_CONFIG[side]["aws_access_key_id"] for side in ("source", "destination")
+}
+
+
+def redact_key_id(value):
+    """An access key ID shortened for output to its first and last four characters.
+
+    That's enough to tell which key is in use without printing the key. On AWS the
+    first four only say what kind of key it is (AKIA long-term, ASIA temporary), the
+    last four are what `aws configure list` shows, and the twelve in between stay
+    hidden, so the ID can't be used to look up the AWS account it belongs to. A key
+    ID shorter than 20 characters is hidden entirely, since four and four would be
+    most of it. null, which hands the side to boto3's credential chain, and the
+    placeholders are left as they are.
+    """
+    if value is None or value in PLACEHOLDER_KEY_IDS:
+        return value
+    value = str(value)
+    if len(value) < 20:
+        return "***"
+    return f"{value[:4]}...{value[-4:]}"
+
+
 # S3's multipart upload limits. s3transfer can only keep an upload within them when
 # it knows the object's size, and s3mirror streams each object without one, so
 # part_size_for() picks the part size per object instead.
@@ -170,7 +196,7 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
         self.logger.debug("Source region: %s", config["source"]["region_name"])
         self.logger.debug(
             "Source access key: %s",
-            self._redact(config["source"]["aws_access_key_id"]),
+            redact_key_id(config["source"]["aws_access_key_id"]),
         )
         self.logger.debug(
             "Destination endpoint: %s",
@@ -181,7 +207,7 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
         )
         self.logger.debug(
             "Destination access key: %s",
-            self._redact(config["destination"]["aws_access_key_id"]),
+            redact_key_id(config["destination"]["aws_access_key_id"]),
         )
         self.logger.debug("Max workers: %d", self.max_workers)
         self.logger.debug(
@@ -520,15 +546,6 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
         hours = int(seconds // 3600)
         minutes = int((seconds % 3600) // 60)
         return f"{hours}h {minutes}m"
-
-    @staticmethod
-    def _redact(value: str) -> str:
-        """Mask access key values in debug output."""
-        if not value:
-            return "***"
-        if len(value) <= 8:
-            return "***"
-        return f"{value[:4]}...{value[-4:]}"
 
     def _calculate_differences(
         self,
@@ -949,6 +966,16 @@ def load_config(config_path: Optional[str]) -> dict:
         sys.exit(1)
 
 
+def redacted_config(config: dict) -> dict:
+    """A copy of the config that's safe to print, for --show-config."""
+    display_config = json.loads(json.dumps(config))
+    for side in ("source", "destination"):
+        section = display_config[side]
+        section["aws_access_key_id"] = redact_key_id(section["aws_access_key_id"])
+        section["aws_secret_access_key"] = "***REDACTED***"
+    return display_config
+
+
 def tls_verified(verify) -> bool:
     """Whether boto3 checks certificates when given this verify_ssl value."""
     return verify is None or bool(verify)
@@ -1059,10 +1086,7 @@ def main():
         config["sync"]["delete_extraneous"] = False
 
     if args.show_config:
-        display_config = json.loads(json.dumps(config))
-        display_config["source"]["aws_secret_access_key"] = "***REDACTED***"
-        display_config["destination"]["aws_secret_access_key"] = "***REDACTED***"
-        print(json.dumps(display_config, indent=2))
+        print(json.dumps(redacted_config(config), indent=2))
         sys.exit(0)
 
     logger = setup_logging(args)

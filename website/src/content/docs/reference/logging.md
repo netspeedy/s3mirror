@@ -99,8 +99,8 @@ message and HTTP status), `Failed to list source buckets`, `Failed to check buck
 `on the destination`, `Failed to copy <key>`, `Failed to delete <key>`, and `FATAL ERROR` with a
 traceback for anything unexpected.
 
-**Debug** adds the detail: the settings in use, including each endpoint's region, with access keys
-shortened to their first and last four characters, a sample of the source's bucket names, each
+**Debug** adds the detail: the settings in use, including each endpoint's region, with access key
+IDs shortened to their first and last four characters (or `***` if shorter than 20), a sample of the source's bucket names, each
 listing's object count, page count and sizes, or how far a failed listing got, every `New file:`
 and `Changed:` decision, the keys to delete, the part size for an object too big for the configured
 one (`Using 11.0MB parts for ...`), every key copied or deleted, progress every 50 copies, and
