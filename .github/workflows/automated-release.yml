@@ -79,6 +79,62 @@ jobs:
             echo "release_required=true" >> "${GITHUB_OUTPUT}"
           fi
 
+      # Dependency and code changes ship on their own: when release-bearing commits have landed
+      # since the last release and __version__ hasn't moved, bump it here. The pushed commit runs
+      # this workflow again, which then tags the new version and starts the publish workflows.
+      - name: Work out whether unreleased changes need a release
+        if: steps.existing.outputs.release_required == 'false'
+        id: next
+        run: |
+          while IFS='=' read -r key value; do
+            echo "${key}=${value}" >> "${GITHUB_OUTPUT}"
+          done < <(bash scripts/release/next-release.sh)
+
+      - name: Bump __version__ on main
+        if: steps.next.outputs.release_required == 'true'
+        id: bump
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          NEXT_TAG: ${{ steps.next.outputs.next_tag }}
+          RELEASE_AUTOMATION_TOKEN: ${{ secrets.RELEASE_AUTOMATION_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          git fetch origin "refs/heads/${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}" --force
+          if [ "$(git rev-parse "refs/remotes/origin/${DEFAULT_BRANCH}")" != "$(git rev-parse HEAD)" ]; then
+            echo "main has moved on; the run for the newer commit will handle the release."
+            exit 0
+          fi
+
+          version="${NEXT_TAG#v}"
+          python - "${version}" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          path = Path("s3mirror.py")
+          text, count = re.subn(
+              r'^__version__ = "[^"]+"$', f'__version__ = "{sys.argv[1]}"', path.read_text(), flags=re.M
+          )
+          if count != 1:
+              raise SystemExit("expected exactly one __version__ assignment in s3mirror.py")
+          path.write_text(text)
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "chore(release): bump version to ${version}" -- s3mirror.py
+          if ! git push "https://x-access-token:${RELEASE_AUTOMATION_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "HEAD:refs/heads/${DEFAULT_BRANCH}" 2>push.err; then
+            cat push.err >&2
+            if grep -Eiq 'non-fast-forward|fetch first|rejected' push.err; then
+              echo "main moved while pushing the version bump; the run for the newer commit will handle it."
+              exit 0
+            fi
+            exit 1
+          fi
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
       - name: Create and push stable tag
         if: steps.existing.outputs.release_required == 'true'
         env:
@@ -99,8 +155,13 @@ jobs:
         run: |
           tag="${{ steps.version.outputs.tag }}"
 
+          if [ -n "${{ steps.bump.outputs.version }}" ]; then
+            printf "Bumped \`__version__\` to \`%s\` for the %s changes since \`%s\`; the run for that commit tags and publishes it.\n" \
+              "${{ steps.bump.outputs.version }}" "${{ steps.next.outputs.bump }}" "${tag}" >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
           if [ "${{ steps.existing.outputs.release_required }}" != "true" ]; then
-            printf "Release tag \`%s\` already exists; no tag was created.\n" "${tag}" >> "${GITHUB_STEP_SUMMARY}"
+            printf "Release tag \`%s\` already exists and nothing release-bearing has landed since.\n" "${tag}" >> "${GITHUB_STEP_SUMMARY}"
             exit 0
           fi
 

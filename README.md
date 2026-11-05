@@ -345,7 +345,17 @@ isort automatically. Container Image publishes the multi-arch image when a stabl
 tag is pushed, after checking that the tag is on `main` and matches
 `s3mirror.py --version`. Dependabot checks the Python packages, the Docker base
 image, the Actions and the website weekly, and green Dependabot pull requests are
-merged automatically. The GitHub Pages site is built from `website/`, and its
+merged automatically.
+
+Releases are automatic. Automated Release tags `v<__version__>` when that tag
+doesn't exist yet. When it does, but release-bearing commits have landed since
+(`feat:`, `fix:`, `deps:`, `build:` and the others `scripts/release/next-release.sh`
+counts), it bumps `__version__` in `s3mirror.py` itself, and the run for that
+commit tags it, which publishes the image and the Homebrew formula. Dependabot
+titles Python and base-image updates `deps:`, so they ship on their own, while
+Actions updates are `ci:` and website updates `chore:`.
+
+The GitHub Pages site is built from `website/`, and its
 [README](website/README.md) covers the `make website-*` targets and how the site
 is published.
 
