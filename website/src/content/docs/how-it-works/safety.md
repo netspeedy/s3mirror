@@ -18,7 +18,7 @@ Give s3mirror its own credential on each side, with only what a mirror needs. In
 | Source | `s3:ListBucket` on each mirrored bucket | Listing its objects |
 | Source | `s3:GetObject` on each mirrored bucket's objects | Reading each object it copies |
 | Destination | `s3:ListAllMyBuckets` | The connection check |
-| Destination | `s3:ListBucket` on each mirrored bucket | `HeadBucket` and listing its objects |
+| Destination | `s3:ListBucket` on each mirrored bucket | `HeadBucket` and listing its objects; without it, the bucket is skipped |
 | Destination | `s3:CreateBucket` | Only if s3mirror should create missing buckets |
 | Destination | `s3:PutObject` on each mirrored bucket's objects | Single and multipart uploads |
 | Destination | `s3:AbortMultipartUpload` on each mirrored bucket's objects | Cleaning up a multipart upload that failed |

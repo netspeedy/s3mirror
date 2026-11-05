@@ -27,7 +27,8 @@ The run counted at least one error, which is one of:
 
 - an object that failed to copy
 - an object that failed to delete
-- a destination bucket that couldn't be created, so the bucket was skipped
+- a destination bucket that `HeadBucket` couldn't check, other than a 404 for a missing one, or
+  that couldn't be created, so the bucket was skipped
 - a bucket whose objects couldn't be listed in full on either side, so the bucket was skipped with
   nothing copied or deleted
 - the source's bucket list, if it couldn't be read again after the connection check, in which case

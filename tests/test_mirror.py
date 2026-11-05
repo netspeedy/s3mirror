@@ -93,3 +93,36 @@ def test_a_failed_bucket_listing_fails_the_run(
     assert "No buckets found to sync" not in output
     assert "Status: COMPLETED WITH ERRORS" in output
     assert not destination.buckets()
+
+
+def test_a_forbidden_head_bucket_skips_the_bucket_without_creating_it(
+    source, destination, config, run, faults
+):
+    """A 403 from HeadBucket says nothing about whether the bucket exists."""
+    source.put("app-data", IN_SYNC)
+    source.put("media-assets", {"logo.svg": b"<svg/>"})
+    faults.fail("DESTINATION", "HeadBucket", bucket="app-data", code="403", status=403)
+    faults.fail("DESTINATION", "CreateBucket", bucket="app-data", code="Unexpected")
+
+    code, output = run(config)
+
+    assert code == 1, output
+    assert "Failed to check bucket on destination" in output
+    assert "Skipping bucket due to HeadBucket failure" in output
+    assert "Unexpected" not in output
+    assert destination.buckets() == ["media-assets"]
+    assert "Status: COMPLETED WITH ERRORS" in output
+
+
+def test_a_missing_bucket_reported_as_no_such_bucket_is_created(
+    source, destination, config, run, faults
+):
+    """Some services answer HeadBucket with a NoSuchBucket code, which is a 404 too."""
+    source.put("app-data", IN_SYNC)
+    faults.fail("DESTINATION", "HeadBucket", code="NoSuchBucket", status=404)
+
+    code, output = run(config)
+
+    assert code == 0, output
+    assert "✓ Created bucket: app-data" in output
+    assert destination.objects("app-data") == IN_SYNC

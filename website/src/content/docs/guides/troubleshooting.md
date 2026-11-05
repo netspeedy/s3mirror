@@ -48,9 +48,18 @@ credential can't create buckets, or the provider wants them created another way.
 `CreateBucket` with only the name, without a location constraint, which AWS rejects in any region
 other than `us-east-1`. Create the bucket yourself in that case, and s3mirror will use it.
 
-s3mirror also tries to create a bucket when `HeadBucket` fails for any reason, so a bucket that
-exists but that the credential can't see gets a `CreateBucket` call too, which usually fails with
-`BucketAlreadyExists` or `BucketAlreadyOwnedByYou`.
+s3mirror only creates a bucket when `HeadBucket` says it doesn't exist, with a 404. Any other
+answer skips the bucket and counts as an error, without trying to create it:
+
+```text title="Output"
+  ✗ Failed to check bucket on destination: An error occurred (403) when calling the HeadBucket operation: Forbidden
+  Skipping bucket due to HeadBucket failure
+```
+
+A 403 means the bucket exists but the destination credential can't see it, usually because it
+lacks `s3:ListBucket` on it, or the bucket belongs to another account. Bucket names are global on
+AWS, so a 403 for a bucket you expected s3mirror to create means someone else already has that
+name; exclude it, or mirror it somewhere else by hand.
 
 ## An object isn't copied
 

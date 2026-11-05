@@ -24,9 +24,10 @@ run it again without cleaning anything up.
    and goes straight to the summary. If this second `ListBuckets` call fails, that's counted as an
    error and it goes straight to the summary too.
 
-3. **Destination bucket.** For each bucket it calls `HeadBucket` at the destination. If that
-   fails for any reason, it calls `CreateBucket` with the same name. If the create fails, the bucket
-   is skipped, counted as an error, and the run moves on to the next one.
+3. **Destination bucket.** For each bucket it calls `HeadBucket` at the destination. Only a 404,
+   meaning the bucket doesn't exist, leads to a `CreateBucket` with the same name. If `HeadBucket`
+   fails any other way, such as a 403 for a bucket the credential can't see, or the create fails,
+   the bucket is skipped, counted as an error, and the run moves on to the next one.
 
 4. **Listings.** It lists every object in the bucket on both sides with `ListObjectsV2`, page by
    page, keeping each key and its size. If either listing fails, on any page, the bucket is
@@ -82,9 +83,9 @@ as throughput. `--workers` overrides `max_workers` for one run.
 ## What a run counts as an error
 
 The error count, and so the exit code, covers objects that failed to copy, objects that failed to
-delete, destination buckets that couldn't be created, buckets whose objects couldn't be listed on
-either side, and a failed listing of the source's buckets. A bucket that couldn't be created or
-listed is skipped, so a run that reports `COMPLETED SUCCESSFULLY` and exits 0 mirrored every bucket
+delete, destination buckets that couldn't be checked or created, buckets whose objects couldn't be
+listed on either side, and a failed listing of the source's buckets. A bucket that couldn't be
+checked, created or listed is skipped, so a run that reports `COMPLETED SUCCESSFULLY` and exits 0 mirrored every bucket
 it found. [Deletion](/s3mirror/how-it-works/deletion/#when-a-listing-fails) explains why a failed
 listing never leads to deletions.
 
