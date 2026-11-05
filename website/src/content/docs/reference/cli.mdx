@@ -18,7 +18,7 @@ export const outputOptions = [
 ];
 
 export const otherOptions = [
-  { flag: "--show-config", description: "Print the configuration the run would use as JSON, after `--workers` and `--no-delete` are applied and with both secret keys redacted, then exit 0 without connecting. A config value s3mirror can't use is reported as an error instead, with exit code 1." },
+  { flag: "--show-config", description: "Print the configuration the run would use as JSON, after `--workers` and `--no-delete` are applied and with the keys redacted, then exit 0 without connecting. A config value s3mirror can't use is reported as an error instead, with exit code 1." },
   { flag: "--version", description: "Print the version, such as `S3 Mirror v1.0.4`, then exit 0." },
   { short: "-h", flag: "--help", description: "Print usage and the flags, then exit 0." },
 ];

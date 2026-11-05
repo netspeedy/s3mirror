@@ -57,7 +57,8 @@ s3mirror --config config.yaml --show-config
 
 It prints the merged configuration as JSON, with `"false"` and `"true"` strings read as booleans,
 after `--workers` and `--no-delete` are applied, with both secret keys replaced by
-`***REDACTED***`, and exits 0 without connecting to anything. A value s3mirror can't read is
+`***REDACTED***` and the access key IDs shortened to their first and last four characters, and
+exits 0 without connecting to anything. A value s3mirror can't read is
 reported as a config error instead, with exit code 1.
 
 ## The two endpoints
