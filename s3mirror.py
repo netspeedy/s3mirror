@@ -121,6 +121,7 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
         self.logger.debug("INITIALIZATION")
         self.logger.debug("=" * 70)
         self.logger.debug("Source endpoint: %s", config["source"]["endpoint_url"])
+        self.logger.debug("Source region: %s", config["source"]["region_name"])
         self.logger.debug(
             "Source access key: %s",
             self._redact(config["source"]["aws_access_key_id"]),
@@ -128,6 +129,9 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
         self.logger.debug(
             "Destination endpoint: %s",
             config["destination"]["endpoint_url"],
+        )
+        self.logger.debug(
+            "Destination region: %s", config["destination"]["region_name"]
         )
         self.logger.debug(
             "Destination access key: %s",
@@ -295,16 +299,30 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
             return None
 
     def create_bucket(self, bucket_name: str) -> bool:
-        """Create bucket on destination."""
+        """Create bucket on destination, in the destination client's region."""
+        params = {"Bucket": bucket_name}
+        # AWS creates a bucket in us-east-1 when there's no location constraint, and
+        # rejects one that names us-east-1. Every other region has to be named, and
+        # must match the region the request is signed for.
+        region = self.dest_client.meta.region_name
+        if region and region not in {"us-east-1", "aws-global"}:
+            params["CreateBucketConfiguration"] = {"LocationConstraint": region}
         try:
-            self.logger.debug("  Creating bucket on destination...")
-            self.dest_client.create_bucket(Bucket=bucket_name)
+            self.logger.debug(
+                "  Creating bucket on destination in %s...",
+                region or "the default region",
+            )
+            self.dest_client.create_bucket(**params)
             self.logger.info("  ✓ Created bucket: %s", bucket_name)
             self.stats["buckets_created"] += 1
             return True
         except botocore.exceptions.ClientError as err:
             self.logger.error("  ✗ Failed to create bucket: %s", err)
             self.logger.debug("    Error details: %s", err.response)
+            self.stats["errors"] += 1
+            return False
+        except botocore.exceptions.BotoCoreError as err:
+            self.logger.error("  ✗ Failed to create bucket: %s", err)
             self.stats["errors"] += 1
             return False
 

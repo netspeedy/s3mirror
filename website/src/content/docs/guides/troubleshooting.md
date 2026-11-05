@@ -44,9 +44,11 @@ written for 1.0.4 or earlier often relied on the old `false` default.
 ```
 
 The bucket is skipped and counted as an error, and the run carries on. Either the destination
-credential can't create buckets, or the provider wants them created another way. s3mirror calls
-`CreateBucket` with only the name, without a location constraint, which AWS rejects in any region
-other than `us-east-1`. Create the bucket yourself in that case, and s3mirror will use it.
+credential can't create buckets, or the provider wants them created another way. s3mirror creates
+each bucket in the destination's `region_name`, naming it as the location constraint unless it's
+`us-east-1`, which is what AWS expects. Some S3-compatible services reject a location constraint
+that isn't their own region name, with `InvalidLocationConstraint`; set `region_name` to the name
+the provider documents, or create the bucket yourself, and s3mirror will use it.
 
 s3mirror only creates a bucket when `HeadBucket` says it doesn't exist, with a 404. Any other
 answer skips the bucket and counts as an error, without trying to create it:

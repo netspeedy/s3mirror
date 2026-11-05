@@ -25,9 +25,10 @@ run it again without cleaning anything up.
    error and it goes straight to the summary too.
 
 3. **Destination bucket.** For each bucket it calls `HeadBucket` at the destination. Only a 404,
-   meaning the bucket doesn't exist, leads to a `CreateBucket` with the same name. If `HeadBucket`
-   fails any other way, such as a 403 for a bucket the credential can't see, or the create fails,
-   the bucket is skipped, counted as an error, and the run moves on to the next one.
+   meaning the bucket doesn't exist, leads to a `CreateBucket` with the same name, in the
+   destination's `region_name`. If `HeadBucket` fails any other way, such as a 403 for a bucket the
+   credential can't see, or the create fails, the bucket is skipped, counted as an error, and the
+   run moves on to the next one.
 
 4. **Listings.** It lists every object in the bucket on both sides with `ListObjectsV2`, page by
    page, keeping each key and its size. If either listing fails, on any page, the bucket is

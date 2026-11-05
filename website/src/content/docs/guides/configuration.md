@@ -79,7 +79,9 @@ destination:
 
 `region_name` defaults to `us-east-1`. Many S3-compatible services ignore it, but it's part of every
 request signature, so set it to whatever region the provider tells you to use. On AWS, use the
-regional endpoint and the matching region.
+regional endpoint and the matching region. The destination's `region_name` is also where s3mirror
+creates any bucket that's missing there: outside `us-east-1` it's sent as the bucket's location
+constraint, as AWS requires.
 
 s3mirror uses path-style addressing for both endpoints, so the endpoint URL is the service's root,
 never a bucket's own hostname.

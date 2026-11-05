@@ -52,7 +52,7 @@ Both sections take the same keys. Each one configures one `boto3` S3 client.
 | `endpoint_url` | `https://s3.source.example.com`, `https://s3.destination.example.com` | The S3 API endpoint, with scheme and any port. Requests use path-style addressing against it. |
 | `aws_access_key_id` | `SOURCE_ACCESS_KEY`, `DEST_ACCESS_KEY` | Access key for the endpoint. Debug output shows only its first and last four characters; `--show-config` shows it in full. |
 | `aws_secret_access_key` | `SOURCE_SECRET_KEY`, `DEST_SECRET_KEY` | Secret key for the endpoint. Never logged, and redacted by `--show-config`. |
-| `region_name` | `us-east-1` | Region used to sign requests. Many non-AWS services ignore it but still need one. |
+| `region_name` | `us-east-1` | Region used to sign requests, and on the destination, the region missing buckets are created in. Many non-AWS services ignore it but still need one. |
 | `verify_ssl` | `true` | TLS certificate verification, passed to `boto3` as `verify`: `true`, `false`, or the path to a CA bundle. |
 
 The defaults are placeholders, so a working config sets at least the endpoint and both keys on each
