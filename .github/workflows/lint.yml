@@ -34,22 +34,25 @@ jobs:
       run: |
         python -m pip install --upgrade pip setuptools wheel
         pip install -r requirements.txt
-        pip install black isort pylint
+        pip install black isort pylint pytest
 
     - name: Run pylint
       run: |
         echo "Running pylint..."
-        pylint s3mirror.py
+        pylint s3mirror.py tests
 
     - name: Check formatting (black)
       run: |
         echo "Checking black formatting..."
-        black --check s3mirror.py
+        black --check s3mirror.py tests
 
     - name: Check imports (isort)
       run: |
         echo "Checking import ordering..."
-        isort --check-only s3mirror.py
+        isort --check-only s3mirror.py tests
+
+    - name: Run tests
+      run: make test PYTHON=python
 
   website:
     name: Website Build
@@ -70,11 +73,12 @@ jobs:
     - name: Install website dependencies
       run: npm ci --prefix website
 
-    - name: Check website contract
-      run: make website-check
-
+    # The check validates the built site in website/dist, so it runs after the build.
     - name: Build website
       run: make website-build
+
+    - name: Check built website
+      run: make website-check
 
   container:
     name: Container Build

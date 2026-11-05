@@ -12,8 +12,9 @@ venv/
 # Website / Node
 website/node_modules/
 website/dist/
-website/.vite/
+website/.astro/
 website/.captures/
+website/.test/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

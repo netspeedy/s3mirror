@@ -1,0 +1,31 @@
+---
+// The page GitHub Pages serves for any address that isn't on the site. It's built here with
+// Starlight's layout rather than from a 404.md in the docs collection, because Starlight also
+// builds every collection entry as an ordinary page, and its /404/ would collide with this route.
+// astro.config.mjs turns off Starlight's own 404 route for the same reason.
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+const page = (path: string) => `${base}${path}`;
+---
+
+<StarlightPage
+  frontmatter={{
+    title: "Page not found",
+    description: "There's no page at this address.",
+    editUrl: false,
+    pagefind: false,
+    tableOfContents: false,
+    prev: false,
+    next: false,
+  }}
+>
+  <p>There's no page at this address. Try one of these:</p>
+  <ul>
+    <li><a href={page("quickstart/")}>Quickstart</a> to install s3mirror and run a first, copy-only mirror</li>
+    <li><a href={page("how-it-works/deletion/")}>Deletion</a> for what s3mirror removes from the destination, and when</li>
+    <li><a href={page("guides/configuration/")}>Configuration</a> for the config file and both endpoints</li>
+    <li>the <a href={page("reference/cli/")}>CLI reference</a> for every flag</li>
+  </ul>
+  <p>Or search with the box at the top of the page.</p>
+</StarlightPage>

@@ -1,0 +1,52 @@
+---
+import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import { links, release } from "../lib/site";
+
+const brew = "brew tap netspeedy/s3mirror\nbrew install s3mirror";
+const image = `${links.image}:${release.tagged ? release.version : "latest"}`;
+const docker = `docker pull ${image}
+docker run --rm ${image} --version`;
+const checkout = `git clone ${links.repo}.git
+cd s3mirror
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -r requirements.txt`;
+---
+
+<Tabs syncKey="install">
+  <TabItem label="Homebrew">
+    <Code lang="bash" code={brew} />
+    <p class="ns-note">
+      macOS and Linux. If Homebrew refuses the new third-party tap, run
+      <code>brew trust netspeedy/s3mirror</code> once, then install again.
+    </p>
+  </TabItem>
+  <TabItem label="Container">
+    <Code lang="bash" code={docker} />
+    <p class="ns-note">
+      <code>linux/amd64</code> and <code>linux/arm64</code> on GHCR. Mount your config into the container and
+      pass the same flags; <a href={`${import.meta.env.BASE_URL}guides/container/`}>Container</a> has the
+      details.
+    </p>
+  </TabItem>
+  <TabItem label="From a checkout">
+    <Code lang="bash" code={checkout} />
+    <p class="ns-note">
+      Python 3.11 or newer. The command is then <code>python3 s3mirror.py</code> rather than
+      <code>s3mirror</code>.
+    </p>
+  </TabItem>
+</Tabs>
+
+<style>
+  .ns-note {
+    margin-top: 0.75rem;
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-3);
+  }
+  .ns-note code {
+    font-size: 0.92em;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+</style>

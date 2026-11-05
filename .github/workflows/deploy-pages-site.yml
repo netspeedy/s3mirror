@@ -1,9 +1,18 @@
 name: Deploy Pages Site
 
+# GitHub Release creates each release with GITHUB_TOKEN, which doesn't start release workflows, so
+# its completion is what redeploys the site with the new version. A release published by hand
+# still arrives as a release event.
 on:
+  push:
+    branches:
+      - main
+  release:
+    types:
+      - published
   workflow_run:
     workflows:
-      - Automated Release
+      - GitHub Release
     types:
       - completed
   workflow_dispatch:
@@ -63,29 +72,19 @@ jobs:
           else
             {
               echo "available=false"
-              echo "tag="
               echo "commit="
             } >> "${GITHUB_OUTPUT}"
           fi
 
-      - name: Build site payload
+      - name: Assemble site payload
         run: |
           site_url="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          # The site reads the release details at build time, so write them first.
+          metadata="${RUNNER_TEMP}/website-metadata.json"
           mkdir -p site
-          npm ci --prefix website
-          make website-check
-          make website-build
-          cp -a website/dist/. site/
-          touch site/.nojekyll
 
           if [ "${{ steps.latest.outputs.available }}" = "true" ]; then
-            latest_release_json="$(jq \
-              --arg old_repo "https://github.com/soakes/${{ github.event.repository.name }}" \
-              --arg new_repo "https://github.com/${GITHUB_REPOSITORY}" \
-              --arg old_pages "https://soakes.github.io/${{ github.event.repository.name }}" \
-              --arg new_pages "${site_url%/}" \
-              'if .body then .body |= (gsub($old_repo; $new_repo) | gsub($old_pages; $new_pages)) else . end' \
-              latest-release.json)"
+            latest_release_json="$(jq '.' latest-release.json)"
           else
             latest_release_json='null'
           fi
@@ -108,7 +107,15 @@ jobs:
               container_url: $container_url,
               release_commit: $release_commit,
               latest_release: $latest_release
-            }' > site/website-metadata.json
+            }' > "${metadata}"
+
+          npm ci --prefix website
+          SITE_METADATA_FILE="${metadata}" make website-build
+          # The check validates the built site in website/dist, so it runs after the build.
+          make website-check
+          cp -a website/dist/. site/
+          cp "${metadata}" site/website-metadata.json
+          touch site/.nojekyll
 
           test -f site/index.html
           test -f site/website-metadata.json

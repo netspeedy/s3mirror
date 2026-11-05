@@ -25,7 +25,7 @@ easy to read and audit. It started as an alternative to vendor-specific mirror
 tooling. Its logs work for a person at a terminal and for cron, systemd timers or
 CI, and the exit code tells a scheduler whether the run went cleanly.
 
-**Quick links:** [Install](#install) · [Try it](#try-it) · [Configuration](#configuration) · [Safety](#safety) · [Container image](#container-image) · [Releases](https://github.com/netspeedy/s3mirror/releases) · [Website](https://netspeedy.github.io/s3mirror/)
+**Quick links:** [Install](#install) · [Try it](#try-it) · [Docs](https://netspeedy.github.io/s3mirror/) · [Deletion](https://netspeedy.github.io/s3mirror/how-it-works/deletion/) · [Config keys](https://netspeedy.github.io/s3mirror/reference/configuration/) · [CLI reference](https://netspeedy.github.io/s3mirror/reference/cli/) · [Releases](https://github.com/netspeedy/s3mirror/releases)
 
 ## Install
 
@@ -175,7 +175,7 @@ lifecycle rules at the destination are left alone.
 
 Copies stream from `get_object` into `upload_fileobj`, which switches to multipart
 uploads above the configured threshold. Requests use path-style addressing and
-botocore's adaptive retries, with up to three attempts.
+botocore's adaptive retries: up to three retries, so four attempts in all.
 
 ## Configuration
 
@@ -215,11 +215,15 @@ sync:
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `endpoint_url` | none | S3-compatible API endpoint URL. |
-| `aws_access_key_id` | none | Access key for the endpoint. |
-| `aws_secret_access_key` | none | Secret key for the endpoint. |
+| `endpoint_url` | placeholder | S3-compatible API endpoint URL. |
+| `aws_access_key_id` | placeholder | Access key for the endpoint. |
+| `aws_secret_access_key` | placeholder | Secret key for the endpoint. |
 | `region_name` | `us-east-1` | Region passed to `boto3`. Many non-AWS services still expect one. |
 | `verify_ssl` | `false` | TLS certificate verification. Set it to `true` unless the endpoint really uses a self-signed certificate on a network you trust. |
+
+The endpoint and key defaults are the placeholders from the example above, such as
+`https://s3.source.example.com` and `SOURCE_ACCESS_KEY`. They fail the connection
+check, so set all three on both sides.
 
 `performance` tunes transfers:
 
@@ -244,12 +248,12 @@ Flags override the config for a single run.
 
 | Flag | Description |
 |------|-------------|
-| `-c`, `--config FILE` | Config file, `.yaml` or `.json`. |
+| `-c`, `--config FILE` | Config file, `.yaml`, `.yml` or `.json`. Every real run needs one. |
 | `-w`, `--workers N` | Override `max_workers`. |
 | `--no-delete` | Don't delete destination-only objects, whatever `delete_extraneous` says. |
 | `-q`, `--quiet` | Errors only on the console. |
 | `-d`, `--debug` | Verbose output, including every transfer decision. |
-| `-l`, `--log-file FILE` | Write a full debug log to a file. The console stays quiet unless `--debug` is also set. |
+| `-l`, `--log-file FILE` | Write a full debug log to a file. The console shows only errors unless `--debug` is also set. |
 | `--show-config` | Print the effective configuration with secret keys redacted, then exit. |
 | `--version` | Print the version and exit. |
 
@@ -263,8 +267,9 @@ s3mirror --config /etc/s3mirror.yaml --log-file /var/log/s3mirror.log --quiet
 
 Each run starts the log file with a session header, so it can be tailed or rotated
 by other tools. s3mirror exits `0` when the run finishes without errors and `1`
-otherwise, including a bad config or an endpoint it can't reach, so alert on the
-exit code. The final summary reports buckets processed and created, objects
+when anything went wrong, including a bad config or an endpoint it can't reach. A
+bad flag or flag value exits `2` before anything runs, and Ctrl+C exits `130`. Alert
+on any non-zero exit code. The final summary reports buckets processed and created, objects
 copied and deleted, data transferred, average throughput and the error count.
 
 | Mode | Console | Log file | Typical use |
@@ -278,8 +283,8 @@ copied and deleted, data transferred, average throughput and the error count.
 
 Stable releases are published to
 [`ghcr.io/netspeedy/s3mirror`](https://github.com/netspeedy/s3mirror/pkgs/container/s3mirror)
-with the tags `latest`, the version (`1.0.3`), the minor version (`1.0`) and the Git
-tag (`v1.0.3`). Mount the config and pass the same flags:
+with the tags `latest`, the version (`X.Y.Z`), the minor version (`X.Y`) and the Git
+tag (`vX.Y.Z`). Mount the config and pass the same flags:
 
 ```bash
 docker run --rm \
@@ -288,13 +293,15 @@ docker run --rm \
   --config /config/config.yaml --no-delete --debug
 ```
 
-For scheduled jobs, pin a version and mount somewhere for the log:
+For scheduled jobs, pin the version you've tested, from
+[Releases](https://github.com/netspeedy/s3mirror/releases), in place of `X.Y.Z`, and
+mount somewhere for the log:
 
 ```bash
 docker run --rm \
   -v /etc/s3mirror.yaml:/config/config.yaml:ro \
   -v /var/log/s3mirror:/logs \
-  ghcr.io/netspeedy/s3mirror:1.0.3 \
+  ghcr.io/netspeedy/s3mirror:X.Y.Z \
   --config /config/config.yaml --log-file /logs/s3mirror.log --quiet
 ```
 
@@ -327,25 +334,26 @@ readable, but the TLS risk is still there.
 
 ## Development
 
-Install the runtime and lint dependencies, then run the same checks CI runs on
-every pull request:
+Install the runtime and development dependencies, then run the same checks the
+Lint workflow runs on every pull request:
 
 ```bash
 python3 -m pip install -r requirements.txt
-python3 -m pip install black isort pylint
-black --check s3mirror.py
-isort --check-only s3mirror.py
-pylint s3mirror.py
+python3 -m pip install black isort pylint pytest
+black --check s3mirror.py tests
+isort --check-only s3mirror.py tests
+pylint s3mirror.py tests
+make test
 make container-smoke
 ```
 
-The Lint workflow runs pylint, black and isort on Python 3.11 to 3.14, builds the
-container, and builds the website. Pushes to `main` are formatted with black and
-isort automatically. Container Image publishes the multi-arch image when a stable
-tag is pushed, after checking that the tag is on `main` and matches
-`s3mirror.py --version`. Dependabot checks the Python packages, the Docker base
-image, the Actions and the website weekly, and green Dependabot pull requests are
-merged automatically.
+The Lint workflow runs pylint, black, isort and the tests on Python 3.11 to 3.14,
+builds the container, and builds and checks the website. Pushes to `main` are
+formatted with black and isort automatically. Container Image publishes the
+multi-arch image when a stable tag is pushed, after checking that the tag is on
+`main` and matches `s3mirror.py --version`. Dependabot checks the Python packages,
+the Docker base image, the Actions and the website weekly, and green Dependabot
+pull requests are merged automatically.
 
 Automated Release tags `v<__version__>` when that tag doesn't exist yet, which
 publishes the image, the Homebrew formula and the GitHub release, with notes
@@ -359,19 +367,22 @@ itself and the run for that commit tags it. Dependabot
 titles Python and base-image updates `deps:`, so they ship on their own, while
 Actions updates are `ci:` and website updates `chore:`.
 
-The GitHub Pages site is built from `website/`, and its
-[README](website/README.md) covers the `make website-*` targets and how the site
-is published.
+The [docs site](https://netspeedy.github.io/s3mirror/) is built with Astro and
+Starlight from `website/`, and its [README](website/README.md) covers the `make
+website-*` targets and how the site is published. If you change a flag, a config
+key, a log line or what gets deleted, update the matching pages in the same change.
+`tests/test_docs.py` fails until the CLI reference page lists exactly the flags the
+parser accepts. [AGENTS.md](AGENTS.md) has the repository's conventions in full.
 
 The banner at the top of this page and the social cards are generated. Edit the
 copy, layout or timing in `scripts/readme/build_readme_hero.py` and run `make
-readme-hero`. That rebuilds `assets/s3mirror-readme-hero.svg`, the website's
-`website/public/og-image.png` and `assets/s3mirror-social-card.png`, which is the
-image for GitHub's social preview and is uploaded by hand in the repository
-settings. It runs the script with `uv`, which installs the pinned fontTools it
-subsets the fonts with, and renders the cards with headless Chrome or Chromium. The
-fonts come from assets.netspeedy.io, so the first run needs network access. If you
-change the headline's words, measure them again with `uv run
+readme-hero`. That rebuilds `assets/s3mirror-readme-hero.svg`, the website's share
+card, mark and icons, and `assets/s3mirror-social-card.png`, which is the image for
+GitHub's social preview and is uploaded by hand in the repository settings. It runs
+the script with `uv`, which installs the pinned fontTools it subsets the fonts
+with, and renders the cards and icons with headless Chrome or Chromium. The fonts
+come from assets.netspeedy.io, so the first run needs network access. If you change
+the headline's words, measure them again with `uv run
 scripts/readme/measure_headline.py`.
 
 Contributions are welcome. Checksum-aware change detection, mirroring metadata,

@@ -1,0 +1,134 @@
+---
+title: Container
+description: Run the GHCR image with a mounted config, keep a log on the host, pin a version, and schedule it.
+---
+
+import { Code } from "@astrojs/starlight/components";
+import { links, release } from "../../../lib/site";
+
+export const tag = release.tagged ? release.version : "v1.2.3";
+export const minor = tag.replace(/^v(\d+\.\d+)\..*$/, "$1");
+export const image = `${links.image}:${tag}`;
+// MDX drops the leading spaces of each line in a multi-line template literal, so the blocks with
+// indented continuation lines are built from arrays of lines.
+export const lines = (...rows) => rows.join("\n");
+export const run = lines(
+  "docker run --rm \\",
+  '  -v "$PWD/config.yaml:/config/config.yaml:ro" \\',
+  `  ${image} \\`,
+  "  --config /config/config.yaml --no-delete --debug",
+);
+export const withLog = lines(
+  "docker run --rm \\",
+  '  --user "$(id -u):$(id -g)" \\',
+  "  -v /etc/s3mirror.yaml:/config/config.yaml:ro \\",
+  "  -v /var/log/s3mirror:/logs \\",
+  `  ${image} \\`,
+  "  --config /config/config.yaml --log-file /logs/s3mirror.log",
+);
+export const withCa = lines(
+  "docker run --rm \\",
+  "  -v /etc/s3mirror.yaml:/config/config.yaml:ro \\",
+  "  -v /etc/ssl/certs/internal-ca.pem:/config/internal-ca.pem:ro \\",
+  `  ${image} \\`,
+  "  --config /config/config.yaml",
+);
+export const unit = lines(
+  "[Unit]",
+  "Description=Mirror S3 buckets with s3mirror",
+  "Wants=network-online.target",
+  "After=network-online.target docker.service",
+  "Requires=docker.service",
+  "",
+  "[Service]",
+  "Type=oneshot",
+  "ExecStart=/usr/bin/docker run --rm --init --name s3mirror \\",
+  "  --user 1000:1000 \\",
+  "  -v /etc/s3mirror.yaml:/config/config.yaml:ro \\",
+  "  -v /var/log/s3mirror:/logs \\",
+  `  ${image} \\`,
+  "  --config /config/config.yaml --log-file /logs/s3mirror.log",
+);
+
+The image is `ghcr.io/netspeedy/s3mirror`, built for `linux/amd64` and `linux/arm64` from the
+repository's `Dockerfile`: a slim Python image with the three packages installed and `s3mirror.py`
+copied in. Its entrypoint is s3mirror, so everything after the image name is passed to s3mirror as
+flags. With no flags it prints its help.
+
+## Run it
+
+Mount the config file read-only and point `--config` at it:
+
+<Code lang="bash" code={run} />
+
+Output goes to the container's standard output unbuffered, so `docker logs` and CI logs show it as
+it happens, and `docker run` exits with s3mirror's exit code.
+
+The container needs to reach both endpoints. If an endpoint's hostname only resolves on the host,
+or it's on `localhost`, run with `--network host` or use an address the container can reach.
+
+## Tags
+
+Every stable release is published under four tags:
+
+| Tag | Example | Moves when |
+| --- | --- | --- |
+| The release tag | <code>{tag}</code> | Never |
+| The version | <code>{tag.replace(/^v/, "")}</code> | Never |
+| The minor line | <code>{minor}</code> | Each patch release in that line |
+| `latest` | `latest` | Each release |
+
+Pin the release tag or the version for scheduled jobs, so an upgrade happens when you choose. Images
+are published only for stable tags on `main`, after a check that the tag matches the script's
+`__version__`, and carry build provenance and an SBOM.
+
+## Keeping a log on the host
+
+Mount a directory for the log and pass `--log-file` inside it:
+
+<Code lang="bash" code={withLog} />
+
+The image runs as an unprivileged `s3mirror` user created at build time, with no fixed UID, so it
+usually can't write to a host directory owned by someone else. `--user` runs it as your own UID and
+GID instead, which can write wherever you can; the script and its packages are readable by any
+user. If the log can't be opened, s3mirror stops with a traceback and exit code 1 before connecting
+to anything.
+
+The config only has to be readable by the user the container runs as. With `--user`, a config that's
+`chmod 600` and owned by you works.
+
+## A private CA
+
+If an endpoint uses a certificate from your own CA, mount the CA bundle and give its path inside the
+container as `verify_ssl`:
+
+<Code lang="bash" code={withCa} />
+
+```yaml title="/etc/s3mirror.yaml"
+destination:
+  endpoint_url: "https://minio.internal.example:9000"
+  aws_access_key_id: "DEST_ACCESS_KEY"
+  aws_secret_access_key: "DEST_SECRET_KEY"
+  verify_ssl: "/config/internal-ca.pem"
+```
+
+## Scheduling
+
+Start the container from the host's scheduler with `--rm`, the same way
+[Scheduling](/s3mirror/guides/scheduling/) starts the installed command. In a systemd unit:
+
+<Code lang="ini" title="/etc/systemd/system/s3mirror.service" code={unit} />
+
+Pair it with the timer on the Scheduling page. Use the UID and GID that own `/var/log/s3mirror` in
+`--user`. The fixed `--name` makes a second container refuse to start while one is still running.
+
+## Stopping it
+
+s3mirror runs as process 1 in the container and doesn't handle `SIGTERM`, and Linux ignores a signal
+that process 1 has no handler for. So `docker stop` waits out its timeout, 10 seconds by default,
+and then kills the container, which exits 137. With `--init`, as in the unit above, a small init
+process passes `SIGTERM` on and s3mirror stops at once. Either way it stops mid-run without a
+summary; the next run picks up where it left off.
+
+Ctrl+C on an attached `docker run` is passed on as `SIGINT`, which s3mirror does handle: it waits
+for the copies or deletions already queued for the current bucket, then exits 130 without a summary.

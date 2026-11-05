@@ -1,0 +1,74 @@
+---
+title: Installation
+description: Install s3mirror with Homebrew, run the container image from GHCR, or run the script from a checkout.
+---
+
+import { Code } from "@astrojs/starlight/components";
+import { links, release } from "../../lib/site";
+
+export const image = `${links.image}:${release.tagged ? release.version : "latest"}`;
+
+s3mirror is one Python script. It needs Python 3.11 or newer and three packages: `boto3`, `urllib3`
+and `PyYAML`. Every release is published as a Homebrew formula and a multi-arch container image,
+from the same tag.
+
+## Homebrew
+
+The easiest route on macOS and Linux:
+
+```bash
+brew tap netspeedy/s3mirror
+brew install s3mirror
+```
+
+:::note
+Recent Homebrew may refuse a new third-party tap until you trust it. If the install is refused,
+run `brew trust netspeedy/s3mirror` once, then `brew install s3mirror` again.
+:::
+
+The formula installs the script and its packages into their own virtual environment on Homebrew's
+Python, and puts an `s3mirror` command on your path. To upgrade:
+
+```bash
+brew upgrade s3mirror
+```
+
+## Container image
+
+Releases are published to [GHCR](https://github.com/netspeedy/s3mirror/pkgs/container/s3mirror)
+for `linux/amd64` and `linux/arm64`:
+
+<Code lang="bash" code={`docker pull ${image}`} />
+
+The image's entrypoint is s3mirror itself, so arguments after the image name are s3mirror's
+flags, and with none it prints its help. You mount the config file into the container;
+[Container](/s3mirror/guides/container/) covers the tags, mounts and the user it runs as.
+
+## From a checkout
+
+Clone the repository and install the three packages into a virtual environment:
+
+```bash
+git clone https://github.com/netspeedy/s3mirror.git
+cd s3mirror
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+From a checkout the command is `python3 s3mirror.py` rather than `s3mirror`, with the same flags:
+
+```bash
+python3 s3mirror.py --config config.yaml --show-config
+```
+
+`requirements.txt` doesn't pin versions, so this installs the newest `boto3`, `urllib3` and
+`PyYAML`. To upgrade, pull and run the `pip install` again in the same virtual environment.
+
+## Check the version
+
+```bash
+s3mirror --version
+```
+
+<Code lang="text" title="Output" code={`S3 Mirror ${release.tagged ? release.version : "v1.2.3"}`} />

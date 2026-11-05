@@ -43,12 +43,12 @@ jobs:
     - name: Run black formatter
       run: |
         echo "Running black..."
-        black s3mirror.py
+        black s3mirror.py tests
 
     - name: Run isort
       run: |
         echo "Running isort..."
-        isort s3mirror.py
+        isort s3mirror.py tests
 
     - name: Check for changes
       id: changes
@@ -65,7 +65,7 @@ jobs:
     - name: Commit and push changes
       if: steps.changes.outputs.changes == 'true'
       run: |
-        git add s3mirror.py
+        git add s3mirror.py tests
         git commit -m "chore: auto-format code with black and isort
 
         - Auto-formatted with black (https://github.com/psf/black)
