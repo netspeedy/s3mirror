@@ -126,3 +126,19 @@ def test_a_missing_bucket_reported_as_no_such_bucket_is_created(
     assert code == 0, output
     assert "✓ Created bucket: app-data" in output
     assert destination.objects("app-data") == IN_SYNC
+
+
+def test_a_bucket_is_created_in_the_destination_region(
+    source, destination, config, run
+):
+    """Outside us-east-1, CreateBucket has to name the region it's sent to."""
+    source.put("app-data", IN_SYNC)
+    config["destination"]["region_name"] = "eu-west-2"
+
+    code, output = run(config)
+
+    assert code == 0, output
+    assert "✓ Created bucket: app-data" in output
+    location = destination.client.get_bucket_location(Bucket="app-data")
+    assert location["LocationConstraint"] == "eu-west-2"
+    assert destination.objects("app-data") == IN_SYNC

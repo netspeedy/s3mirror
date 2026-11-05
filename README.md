@@ -222,7 +222,7 @@ sync:
 | `endpoint_url` | placeholder | S3-compatible API endpoint URL. |
 | `aws_access_key_id` | placeholder | Access key for the endpoint. |
 | `aws_secret_access_key` | placeholder | Secret key for the endpoint. |
-| `region_name` | `us-east-1` | Region passed to `boto3`. Many non-AWS services still expect one. |
+| `region_name` | `us-east-1` | Region passed to `boto3`, and on the destination, the region missing buckets are created in. Many non-AWS services still expect one. |
 | `verify_ssl` | `true` | TLS certificate verification: `true`, `false`, or the path to a CA bundle for a private CA or a self-signed certificate. |
 
 The endpoint and key defaults are the placeholders from the example above, such as
