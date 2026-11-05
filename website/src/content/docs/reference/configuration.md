@@ -39,9 +39,11 @@ sync:
     - temporary-exports
 ```
 
-None of the values are checked when the file is loaded. A key s3mirror doesn't know is kept and
-ignored, and a value of the wrong type fails later, during the run, or quietly does the wrong thing.
-The notes below say where that matters.
+`delete_extraneous` and `verify_ssl` are checked when the file is loaded, and a value s3mirror
+can't read stops it with `Error: Invalid config in <file>: ...` and exit code 1 before it connects.
+The other values aren't checked yet. A key s3mirror doesn't know is kept and ignored, and a value of
+the wrong type fails later, during the run, or quietly does the wrong thing. The notes below say
+where that matters.
 
 ## `source` and `destination`
 
@@ -53,7 +55,7 @@ Both sections take the same keys. Each one configures one `boto3` S3 client.
 | `aws_access_key_id` | `SOURCE_ACCESS_KEY`, `DEST_ACCESS_KEY` | Access key for the endpoint. Debug output shows only its first and last four characters; `--show-config` shows it in full. |
 | `aws_secret_access_key` | `SOURCE_SECRET_KEY`, `DEST_SECRET_KEY` | Secret key for the endpoint. Never logged, and redacted by `--show-config`. |
 | `region_name` | `us-east-1` | Region used to sign requests, and on the destination, the region missing buckets are created in. Many non-AWS services ignore it but still need one. |
-| `verify_ssl` | `true` | TLS certificate verification, passed to `boto3` as `verify`: `true`, `false`, or the path to a CA bundle. |
+| `verify_ssl` | `true` | TLS certificate verification, passed to `boto3` as `verify`: `true`, `false` (or those as strings, in any case), or the path to a CA bundle file or directory that exists. |
 
 The defaults are placeholders, so a working config sets at least the endpoint and both keys on each
 side. With both keys on a side set to `null`, `boto3` uses its own credential chain for that client;
@@ -84,9 +86,9 @@ All five must be integers. A quoted number such as `"20"` gets past loading and 
 | `delete_extraneous` | `true` | Delete destination objects whose keys the source bucket doesn't have. `--no-delete` sets it to `false` for one run. |
 | `exclude_buckets` | `[]` | Source bucket names to skip entirely, on both sides. Exact names only. |
 
-`delete_extraneous` is tested for truth rather than checked, so only a real boolean `false` turns
-deletion off; the string `"false"` leaves it on. `exclude_buckets` must be a list: a plain string is
-read as a set of single characters and excludes nothing.
+`delete_extraneous` must be `true` or `false`, as a boolean or as a string in any case; anything
+else, `0`, `"no"` and `null` included, is a config error. `exclude_buckets` must be a list: a plain
+string is read as a set of single characters and excludes nothing.
 
 ## Not configurable
 

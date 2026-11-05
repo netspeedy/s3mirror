@@ -764,6 +764,52 @@ def setup_logging(args: argparse.Namespace) -> logging.Logger:
     return logger
 
 
+class ConfigError(ValueError):
+    """A config value s3mirror won't run with."""
+
+
+def config_bool(value, name: str) -> bool:
+    """Read a boolean config value: a real boolean, or the string true or false.
+
+    Anything else is an error rather than a truth test, because a quoted "false" is
+    a non-empty string, and reading it as true would leave deletion on.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value.strip().lower() in {"true", "false"}:
+        return value.strip().lower() == "true"
+    raise ConfigError(f"{name} must be true or false, not {value!r}")
+
+
+def validate_config(config: dict) -> dict:
+    """Check the merged config, normalising the values it accepts.
+
+    Raises ConfigError for a value s3mirror would otherwise misread.
+    """
+    sync = config.get("sync")
+    if isinstance(sync, dict):
+        sync["delete_extraneous"] = config_bool(
+            sync.get("delete_extraneous"), "sync.delete_extraneous"
+        )
+
+    for side in ("source", "destination"):
+        section = config.get(side)
+        if not isinstance(section, dict):
+            continue
+        verify = section.get("verify_ssl")
+        if isinstance(verify, bool):
+            continue
+        expected = f"{side}.verify_ssl must be true, false or the path to a CA bundle"
+        if not isinstance(verify, str) or not verify.strip():
+            raise ConfigError(f"{expected}, not {verify!r}")
+        if verify.strip().lower() in {"true", "false"}:
+            section["verify_ssl"] = verify.strip().lower() == "true"
+        elif not Path(verify).exists():
+            raise ConfigError(f"{expected}, and {verify!r} doesn't exist")
+
+    return config
+
+
 def load_config(config_path: Optional[str]) -> dict:
     """Load configuration from file or use defaults."""
     if not config_path:
@@ -805,10 +851,14 @@ def load_config(config_path: Optional[str]) -> dict:
             else:
                 config[key] = value
 
-        return config
-
     except Exception as err:  # pylint: disable=broad-except
         print(f"Error loading config file: {err}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        return validate_config(config)
+    except ConfigError as err:
+        print(f"Error: Invalid config in {config_path}: {err}", file=sys.stderr)
         sys.exit(1)
 
 

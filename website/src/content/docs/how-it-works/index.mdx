@@ -86,8 +86,8 @@ as throughput. `--workers` overrides `max_workers` for one run.
 The error count, and so the exit code, covers objects that failed to copy, objects that failed to
 delete, destination buckets that couldn't be checked or created, buckets whose objects couldn't be
 listed on either side, and a failed listing of the source's buckets. A bucket that couldn't be
-checked, created or listed is skipped, so a run that reports `COMPLETED SUCCESSFULLY` and exits 0 mirrored every bucket
-it found. [Deletion](/s3mirror/how-it-works/deletion/#when-a-listing-fails) explains why a failed
+checked, created or listed is skipped, so a run that reports `COMPLETED SUCCESSFULLY` and exits 0
+mirrored every bucket it found. [Deletion](/s3mirror/how-it-works/deletion/#when-a-listing-fails) explains why a failed
 listing never leads to deletions.
 
 ## Read on
