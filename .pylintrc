@@ -15,3 +15,7 @@ ignored-modules=
     boto3.s3.transfer,
     urllib3,
     yaml
+
+[FORMAT]
+# s3mirror is deliberately a single script, so it's allowed past pylint's default of 1000 lines.
+max-module-lines=1500

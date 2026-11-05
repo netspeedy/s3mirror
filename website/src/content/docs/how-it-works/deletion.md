@@ -55,8 +55,11 @@ sync:
   delete_extraneous: false
 ```
 
-Use YAML's bare `false`, or JSON's `false`. The value isn't checked, only tested for truth, so a
-quoted `"false"` is a non-empty string and leaves deletion on.
+The value has to be `true` or `false`: a real boolean, such as YAML's bare `false` or JSON's
+`false`, or the string `"true"` or `"false"` in any case. Anything else, such as `"no"` in quotes,
+`0` or an empty value, stops s3mirror with a config error and exit code 1 before it connects, so a
+value it can't read never leaves deletion on by accident. Up to and including 1.0.4 the value was
+only tested for truth, and a quoted `"false"` left deletion on.
 
 ## Versioned destinations
 

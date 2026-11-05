@@ -40,8 +40,9 @@ These don't stop the run: it finishes every bucket it can, prints the summary wi
 It also exits 1, without changing anything, when:
 
 - the connection check fails on either side (`Connection verification failed - aborting`)
-- the config file is missing, has an unsupported extension, doesn't parse or isn't a mapping at
-  the top level, with a message on standard error such as `Error: Config file not found: config.yaml`
+- the config file is missing, has an unsupported extension, doesn't parse, isn't a mapping at the
+  top level, or has a `delete_extraneous` or `verify_ssl` value s3mirror can't read, with a message
+  on standard error such as `Error: Config file not found: config.yaml`
 - the log file can't be opened, for example because its directory doesn't exist, which prints a
   Python traceback
 

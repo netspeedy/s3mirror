@@ -46,16 +46,19 @@ performance:
   max_workers: 8
 ```
 
-The merge goes one level deep and doesn't check anything. Keys s3mirror doesn't know are kept and
-ignored, so a misspelt key such as `delete_extranous` silently does nothing. Values aren't
-type-checked either. Run `--show-config` after any change to see what s3mirror will really use:
+The merge goes one level deep. Keys s3mirror doesn't know are kept and ignored, so a misspelt key
+such as `delete_extranous` silently does nothing. Only `delete_extraneous` and `verify_ssl` are
+checked; other values aren't type-checked yet. Run `--show-config` after any change to see what
+s3mirror will really use:
 
 ```bash
 s3mirror --config config.yaml --show-config
 ```
 
-It prints the merged configuration as JSON, after `--workers` and `--no-delete` are applied, with
-both secret keys replaced by `***REDACTED***`, and exits 0 without connecting to anything.
+It prints the merged configuration as JSON, with `"false"` and `"true"` strings read as booleans,
+after `--workers` and `--no-delete` are applied, with both secret keys replaced by
+`***REDACTED***`, and exits 0 without connecting to anything. A value s3mirror can't read is
+reported as a config error instead, with exit code 1.
 
 ## The two endpoints
 
@@ -128,8 +131,9 @@ sync:
 ```
 
 `delete_extraneous` defaults to `true`, so leave it out and runs delete destination objects the
-source doesn't have. Write a bare `false`: a quoted `"false"` is a non-empty string, which counts as
-true. `--no-delete` turns deletion off for one run whatever the file says. Read
+source doesn't have. A bare `false` and a quoted `"false"` both turn it off, and a value that's
+neither true nor false, such as `0` or `"no"`, stops s3mirror with a config error rather than being
+guessed at. `--no-delete` turns deletion off for one run whatever the file says. Read
 [Deletion](/s3mirror/how-it-works/deletion/) before you leave it on.
 
 ## Tuning
