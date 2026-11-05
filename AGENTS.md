@@ -132,6 +132,10 @@
 
 ## Workflow & Security Rules
 
+- Workflows that commit or tag do so as `netspeedybot`
+  (`45371234+netspeedybot@users.noreply.github.com`), never as
+  `github-actions[bot]`. `automated-only.sh` trusts that email, so nobody
+  commits or opens pull requests as netspeedybot by hand.
 - Treat workflow changes as security-sensitive. Keep GitHub Actions permissions
   least-privilege and scoped to the jobs that need them.
 - Pull requests should validate code, the image build and the site without
