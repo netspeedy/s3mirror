@@ -347,11 +347,14 @@ tag is pushed, after checking that the tag is on `main` and matches
 image, the Actions and the website weekly, and green Dependabot pull requests are
 merged automatically.
 
-Releases are automatic. Automated Release tags `v<__version__>` when that tag
-doesn't exist yet. When it does, but release-bearing commits have landed since
-(`feat:`, `fix:`, `deps:`, `build:` and the others `scripts/release/next-release.sh`
-counts), it bumps `__version__` in `s3mirror.py` itself, and the run for that
-commit tags it, which publishes the image and the Homebrew formula. Dependabot
+Automated Release tags `v<__version__>` when that tag doesn't exist yet, which
+publishes the image and the Homebrew formula, so you release a change of your own
+by bumping `__version__` in its pull request. Automated updates release
+themselves: when release-bearing commits have landed since the last tag
+(`feat:`, `fix:`, `deps:`, `build:` and the others
+`scripts/release/next-release.sh` counts) and every one came from Dependabot,
+Renovate or this repository's workflows, Automated Release bumps `__version__`
+itself and the run for that commit tags it. Dependabot
 titles Python and base-image updates `deps:`, so they ship on their own, while
 Actions updates are `ci:` and website updates `chore:`.
 
