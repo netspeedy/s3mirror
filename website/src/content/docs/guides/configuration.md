@@ -156,13 +156,15 @@ All five are plain integers; sizes are in bytes. Some starting points:
   can keep a connection.
 - A few very large objects: `max_workers` matters less than `max_concurrency` and
   `multipart_chunksize`, because each large object is split into parts and the parts run in
-  parallel. s3mirror streams each object without telling the uploader its size, so the part size
-  is never raised automatically. AWS allows 10,000 parts per upload, which with the default 8 MiB
-  parts caps an object at about 78 GiB; raise `multipart_chunksize` if you have larger ones.
+  parallel. S3 allows 10,000 parts per upload, which at the default 8 MiB is about 78 GiB, so for
+  a larger object s3mirror raises the part size to the smallest whole number of MiB that fits: a
+  100 GiB object goes up in 11 MiB parts, a 1 TiB one in 105 MiB parts. You don't need to change
+  `multipart_chunksize` for big objects, only if you want bigger parts for all of them.
 - A rate-limited or shared endpoint: lower `max_workers`, or pass `--workers` for one run.
 - Memory: each large object being uploaded can hold up to ten parts in memory at once, so with 20
   workers all on large objects and 8 MiB parts that's up to about 1.6 GiB. Lower `max_workers` or
-  `multipart_chunksize` on a small machine.
+  `multipart_chunksize` on a small machine. Raised part sizes raise it too: the 1 TiB object above
+  can hold about 1 GiB on its own.
 
 ## Several mirrors
 

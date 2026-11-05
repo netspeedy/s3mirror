@@ -101,8 +101,9 @@ traceback for anything unexpected.
 **Debug** adds the detail: the settings in use, including each endpoint's region, with access keys
 shortened to their first and last four characters, a sample of the source's bucket names, each
 listing's object count, page count and sizes, or how far a failed listing got, every `New file:`
-and `Changed:` decision, the keys to delete, every key copied or deleted, progress every 50 copies,
-and per-bucket timings.
+and `Changed:` decision, the keys to delete, the part size for an object too big for the configured
+one (`Using 11.0MB parts for ...`), every key copied or deleted, progress every 50 copies, and
+per-bucket timings.
 
 ## The summary
 

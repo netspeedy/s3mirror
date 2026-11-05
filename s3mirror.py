@@ -66,6 +66,27 @@ DEFAULT_CONFIG = {
 }
 
 
+# S3's multipart upload limits. s3transfer can only keep an upload within them when
+# it knows the object's size, and s3mirror streams each object without one, so
+# part_size_for() picks the part size per object instead.
+MAX_PARTS = 10_000
+MIN_PART_SIZE = 5 * 1024**2
+MAX_PART_SIZE = 5 * 1024**3
+
+
+def part_size_for(object_size: int, configured: int) -> int:
+    """The part size to upload an object with: `configured`, or larger if need be.
+
+    It's raised, in whole MiB, just far enough that the object fits in MAX_PARTS
+    parts, and kept between S3's 5 MiB minimum and 5 GiB maximum part size.
+    """
+    part_size = max(configured, MIN_PART_SIZE)
+    needed = -(-object_size // MAX_PARTS)
+    if needed > part_size:
+        part_size = -(-needed // 1024**2) * 1024**2
+    return min(part_size, MAX_PART_SIZE)
+
+
 class ColoredFormatter(logging.Formatter):
     """Custom formatter with colors for console output."""
 
@@ -106,13 +127,7 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
         self.max_concurrency = perf["max_concurrency"]
         self.max_pool_connections = perf["max_pool_connections"]
 
-        self.transfer_config = TransferConfig(
-            multipart_threshold=self.multipart_threshold,
-            multipart_chunksize=self.multipart_chunksize,
-            max_concurrency=self.max_concurrency,
-            use_threads=True,
-            max_io_queue=1000,
-        )
+        self.transfer_config = self._transfer_config(self.multipart_chunksize)
 
         self.delete_extraneous = config["sync"]["delete_extraneous"]
         self.exclude_buckets = set(config["sync"]["exclude_buckets"])
@@ -163,6 +178,15 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
             "errors": 0,
             "start_time": time.time(),
         }
+
+    def _transfer_config(self, part_size: int) -> TransferConfig:
+        return TransferConfig(
+            multipart_threshold=self.multipart_threshold,
+            multipart_chunksize=part_size,
+            max_concurrency=self.max_concurrency,
+            use_threads=True,
+            max_io_queue=1000,
+        )
 
     def _create_client(self, endpoint_config: dict, label: str):
         boto_config = Config(
@@ -376,6 +400,18 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
         """Transfer single object from source to destination."""
         body = None
         try:
+            transfer_config = self.transfer_config
+            part_size = part_size_for(size, self.multipart_chunksize)
+            if part_size != self.multipart_chunksize:
+                transfer_config = self._transfer_config(part_size)
+                if size >= self.multipart_threshold:
+                    self.logger.debug(
+                        "    Using %s parts for %s [%s]",
+                        self._format_bytes(part_size),
+                        key,
+                        self._format_bytes(size),
+                    )
+
             response = self.source_client.get_object(Bucket=bucket, Key=key)
             body = response["Body"]
 
@@ -383,7 +419,7 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
                 body,
                 bucket,
                 key,
-                Config=self.transfer_config,
+                Config=transfer_config,
             )
 
             with self._stats_lock:

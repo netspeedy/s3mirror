@@ -58,7 +58,8 @@ and once out to the destination. There's no server-side copy, even when both end
 service.
 
 Objects at or above `multipart_threshold` (8 MiB by default) are uploaded as multipart uploads in
-parts of `multipart_chunksize`. The upload only sets the bucket and key, so the destination object
+parts of `multipart_chunksize`, or bigger parts for an object that would otherwise need more than
+S3's limit of 10,000. The upload only sets the bucket and key, so the destination object
 gets the destination's defaults for everything else, such as storage class and encryption.
 
 Both clients sign requests with Signature Version 4 and use path-style addressing
