@@ -345,7 +345,9 @@ isort automatically. Container Image publishes the multi-arch image when a stabl
 tag is pushed, after checking that the tag is on `main` and matches
 `s3mirror.py --version`. Dependabot checks the Python packages, the Docker base
 image, the Actions and the website weekly, and green Dependabot pull requests are
-merged automatically.
+merged automatically. The GitHub Pages site is built from `website/`, and its
+[README](website/README.md) covers the `make website-*` targets and how the site
+is published.
 
 The banner at the top of this page and the social cards are generated. Edit the
 copy, layout or timing in `scripts/readme/build_readme_hero.py` and run `make
