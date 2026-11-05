@@ -72,7 +72,7 @@ turns off `urllib3`'s per-request insecure-request warnings. Up to 1.0.4 the def
 | --- | --- | --- |
 | `max_workers` | `20` | Objects copied at the same time within a bucket, and later objects deleted. `--workers` overrides it. |
 | `multipart_threshold` | `8388608` (8 MiB) | Size in bytes from which an object is uploaded as a multipart upload. |
-| `multipart_chunksize` | `8388608` (8 MiB) | Size in bytes of each multipart part. |
+| `multipart_chunksize` | `8388608` (8 MiB) | Size in bytes of each multipart part. For an object that would need more than S3's 10,000 parts, about 78 GiB at the default, s3mirror uses the smallest whole number of MiB that fits. Kept between 5 MiB and 5 GiB, S3's limits. |
 | `max_concurrency` | `10` | Threads each object's upload can use for its parts. |
 | `max_pool_connections` | `50` | HTTP connections each client keeps open. Applies to the source and destination clients separately. |
 

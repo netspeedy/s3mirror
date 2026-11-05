@@ -240,7 +240,7 @@ path for that endpoint, or to `false` if you really can't verify it.
 |-----|---------|-------------|
 | `max_workers` | `20` | Worker threads for copies and deletes. |
 | `multipart_threshold` | `8388608` | Object size in bytes at which uploads become multipart. |
-| `multipart_chunksize` | `8388608` | Multipart chunk size in bytes. |
+| `multipart_chunksize` | `8388608` | Multipart chunk size in bytes. Raised for an object that would need more than S3's 10,000 parts. |
 | `max_concurrency` | `10` | Per-transfer concurrency in the `boto3` transfer config. |
 | `max_pool_connections` | `50` | HTTP connection pool size for each S3 client. |
 
