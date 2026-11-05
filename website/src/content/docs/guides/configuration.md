@@ -46,10 +46,10 @@ performance:
   max_workers: 8
 ```
 
-The merge goes one level deep. Keys s3mirror doesn't know are kept and ignored, so a misspelt key
-such as `delete_extranous` silently does nothing. Only `delete_extraneous` and `verify_ssl` are
-checked; other values aren't type-checked yet. Run `--show-config` after any change to see what
-s3mirror will really use:
+The merge goes one level deep, and then the result is checked. A section or key s3mirror doesn't
+know, such as a misspelt `delete_extranous`, or a value of the wrong type stops it before it
+connects, with exit code 1 and every problem listed, so a typo can't quietly leave deletion on.
+Run `--show-config` after any change to see what s3mirror will really use:
 
 ```bash
 s3mirror --config config.yaml --show-config
@@ -94,8 +94,7 @@ The keys are passed to `boto3` exactly as written. If you leave one out, its pla
 stays and the connection check fails. If you set both keys on a side to `null`, `boto3` falls back
 to its usual credential chain for that client (environment variables, `~/.aws/credentials`, an
 instance role). The chain is the same for both sides, so that only makes sense for one of them.
-Setting just one of the pair to `null` stops the run with `FATAL ERROR: Partial credentials found`
-and exit code 1.
+Setting just one of the pair to `null` is a config error.
 
 `verify_ssl` defaults to `true`, which checks the endpoint's certificate against the system's
 trusted CAs. For a private CA or a self-signed certificate, set it to the path of the CA bundle, as
@@ -114,8 +113,8 @@ sync:
     - temporary-exports
 ```
 
-Names must match exactly; there are no patterns or prefixes. `exclude_buckets` has to be a list: a
-single name written as a plain string is read as a set of characters and excludes nothing. Excluded
+Names must match exactly; there are no patterns or prefixes. `exclude_buckets` has to be a list,
+even for one bucket, and a plain string is a config error. Excluded
 buckets are skipped on both sides, so their destination copies are neither updated nor deleted
 from. The run logs `Excluding 2 bucket(s): scratch-bucket, temporary-exports` when any of them are
 on the source.
@@ -151,7 +150,7 @@ performance:
   max_pool_connections: 50
 ```
 
-All five are plain integers; sizes are in bytes. Some starting points:
+All five are whole numbers of at least 1; sizes are in bytes. Some starting points:
 
 - Many small objects: raise `max_workers`, and raise `max_pool_connections` with it so each worker
   can keep a connection.

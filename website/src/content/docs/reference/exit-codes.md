@@ -42,13 +42,13 @@ It also exits 1, without changing anything, when:
 
 - the connection check fails on either side (`Connection verification failed - aborting`)
 - the config file is missing, has an unsupported extension, doesn't parse, isn't a mapping at the
-  top level, or has a `delete_extraneous` or `verify_ssl` value s3mirror can't read, with a message
-  on standard error such as `Error: Config file not found: config.yaml`
+  top level, or has a section, key or value s3mirror can't use, with a message on standard error
+  such as `Error: Config file not found: config.yaml` or `Error: Invalid config in config.yaml: ...`
 - the log file can't be opened, for example because its directory doesn't exist, which prints a
   Python traceback
 
 And it exits 1 part-way through when something unexpected goes wrong, logged as `FATAL ERROR:` with
-a traceback, such as a config value of the wrong type.
+a traceback.
 
 ## 2
 

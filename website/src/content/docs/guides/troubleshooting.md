@@ -104,5 +104,6 @@ Use `--log-file`, which sends the full log to a file and leaves only error lines
 ## A run fails with `FATAL ERROR`
 
 An unexpected exception during the run is logged as `FATAL ERROR:` with a traceback and exit code 1.
-A common cause is a config value of the wrong type, such as `max_workers: "20"` in quotes, because
-s3mirror doesn't check types. Run `--show-config` and look for strings where numbers belong.
+Config mistakes don't get that far: they're reported as `Error: Invalid config in ...` before
+anything connects. A `FATAL ERROR` is something s3mirror didn't expect, so the traceback is worth
+keeping, and worth reporting as an issue.

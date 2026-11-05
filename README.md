@@ -252,6 +252,11 @@ path for that endpoint, or to `false` if you really can't verify it.
 | `delete_extraneous` | `true` | Delete destination objects that don't exist in the source. |
 | `exclude_buckets` | `[]` | Source bucket names to skip entirely. |
 
+s3mirror checks the file when it loads it. An unknown section or key, such as a
+misspelt `delete_extranous`, or a value of the wrong type, such as `max_workers:
+"20"` or a plain string for `exclude_buckets`, stops it with exit code 1 and a list
+of every problem, before it connects to anything.
+
 ## Command-line flags
 
 Flags override the config for a single run.
