@@ -86,9 +86,10 @@ for each bucket its `[n/N]: name` header, a `Created bucket` line if it was crea
 counts on each side, the `Actions:` line, the copy and delete totals with their timings, or
 `Already synchronized (no changes needed)`, and the bucket's time. Then the summary.
 
-**Warning** marks something that didn't happen: `No buckets found to sync`,
-`Skipping bucket due to creation failure` or `due to listing failure`, `⚠ N objects failed to copy`
-or `failed to delete`, `⚠ Errors encountered: N` in the summary, and
+**Warning** marks a risk or something that didn't happen:
+`⚠ TLS certificate verification is off for the source` (or `destination`),
+`No buckets found to sync`, `Skipping bucket due to creation failure` or `due to listing failure`,
+`⚠ N objects failed to copy` or `failed to delete`, `⚠ Errors encountered: N` in the summary, and
 `Operation cancelled by user (Ctrl+C)`.
 
 **Error** is a failed call: the connection check (`✗ Source connection FAILED` with the error code,

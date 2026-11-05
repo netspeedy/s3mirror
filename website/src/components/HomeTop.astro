@@ -58,13 +58,11 @@ const config = `source:
   endpoint_url: "https://s3.source.example.com"
   aws_access_key_id: "SOURCE_ACCESS_KEY"
   aws_secret_access_key: "SOURCE_SECRET_KEY"
-  verify_ssl: true
 
 destination:
   endpoint_url: "https://s3.destination.example.com"
   aws_access_key_id: "DEST_ACCESS_KEY"
-  aws_secret_access_key: "DEST_SECRET_KEY"
-  verify_ssl: true`;
+  aws_secret_access_key: "DEST_SECRET_KEY"`;
 const run = ["s3mirror --config config.yaml --no-delete"];
 const bucketSection = `======================================================================
 [1/2]: app-data

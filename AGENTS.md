@@ -167,7 +167,8 @@
   ```
 - `tests/test_mirror.py` runs `main()` against two moto S3 servers that
   `tests/conftest.py` starts on localhost, one per side, so the source and the
-  destination keep separate state. The `faults` fixture makes chosen calls from
+  destination keep separate state, and `tls_source` is a third that serves HTTPS
+  with a self-signed certificate. The `faults` fixture makes chosen calls from
   s3mirror's own clients fail, with an S3 error or a raised exception, and can
   shrink listing pages to test pagination. A change to mirroring behaviour gets a
   test there. Never point a test at a real endpoint.

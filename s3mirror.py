@@ -43,14 +43,14 @@ DEFAULT_CONFIG = {
         "aws_access_key_id": "SOURCE_ACCESS_KEY",
         "aws_secret_access_key": "SOURCE_SECRET_KEY",
         "region_name": "us-east-1",
-        "verify_ssl": False,
+        "verify_ssl": True,
     },
     "destination": {
         "endpoint_url": "https://s3.destination.example.com",
         "aws_access_key_id": "DEST_ACCESS_KEY",
         "aws_secret_access_key": "DEST_SECRET_KEY",
         "region_name": "us-east-1",
-        "verify_ssl": False,
+        "verify_ssl": True,
     },
     "performance": {
         "max_workers": 20,
@@ -177,7 +177,7 @@ class S3Mirror:  # pylint: disable=too-many-instance-attributes
             aws_access_key_id=endpoint_config["aws_access_key_id"],
             aws_secret_access_key=endpoint_config["aws_secret_access_key"],
             region_name=endpoint_config["region_name"],
-            verify=endpoint_config.get("verify_ssl", False),
+            verify=endpoint_config.get("verify_ssl", True),
             config=boto_config,
         )
 
@@ -777,6 +777,11 @@ def load_config(config_path: Optional[str]) -> dict:
         sys.exit(1)
 
 
+def tls_verified(verify) -> bool:
+    """Whether boto3 checks certificates when given this verify_ssl value."""
+    return verify is None or bool(verify)
+
+
 def positive_int(value: str) -> int:
     """Parse an argparse value that must be a positive integer."""
     try:
@@ -890,15 +895,23 @@ def main():
 
     logger = setup_logging(args)
 
-    if not config["source"].get("verify_ssl") or not config["destination"].get(
-        "verify_ssl"
-    ):
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
     logger.info("=" * 70)
     logger.info("S3 BUCKET MIRROR")
     logger.info("Session started: %s", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     logger.info("=" * 70)
+
+    # urllib3 warns on every request made without certificate checks. Say it once
+    # per endpoint instead, and only for one that really has them off: botocore
+    # verifies when verify is None, and a CA bundle path verifies too.
+    unverified = [
+        label
+        for label in ("source", "destination")
+        if not tls_verified(config[label].get("verify_ssl", True))
+    ]
+    if unverified:
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    for label in unverified:
+        logger.warning("⚠ TLS certificate verification is off for the %s", label)
 
     try:
         mirror = S3Mirror(config, logger)

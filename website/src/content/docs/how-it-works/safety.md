@@ -37,14 +37,11 @@ details.
 
 ## TLS
 
-`verify_ssl` defaults to `false` for both endpoints, which means s3mirror accepts any certificate,
-including one presented by something in the middle. When either side has it off, s3mirror also
-silences `urllib3`'s insecure-request warnings, for both sides, so nothing in the output tells you
-certificates aren't being checked.
-
-Set `verify_ssl: true` for every endpoint with a certificate from a public CA, which is any hosted
-provider. For a private CA, the value is passed straight to `boto3` as its `verify` argument, so a
-path to a CA bundle works there too:
+`verify_ssl` defaults to `true` for both endpoints, so s3mirror checks each endpoint's certificate
+against the system's trusted CAs and refuses to connect if it doesn't verify. That's what any hosted
+provider needs. For a private CA, the value is passed straight to `boto3` as its `verify` argument,
+so a path to a CA bundle works too. For a self-signed certificate, the certificate file itself
+usually works as the bundle:
 
 ```yaml title="config.yaml"
 destination:
@@ -54,7 +51,18 @@ destination:
   verify_ssl: "/etc/ssl/certs/internal-ca.pem"
 ```
 
-Leave it `false` only for an endpoint with a self-signed certificate on a network you trust.
+`verify_ssl: false` turns the check off for that endpoint, so s3mirror accepts any certificate,
+including one presented by something in the middle. Use it only when you can't get the CA bundle,
+and only on a network you trust. Each run then logs
+`⚠ TLS certificate verification is off for the source` (or `destination`) once, after the banner,
+in place of the warning `urllib3` would otherwise print for every request.
+
+:::caution[The default was `false` up to 1.0.4]
+Up to and including 1.0.4, `verify_ssl` defaulted to `false`. A config that leaves it out and
+points at an endpoint with a self-signed or private-CA certificate now fails the connection check
+with `CERTIFICATE_VERIFY_FAILED`. Set `verify_ssl` to the CA bundle, or to `false`, for that
+endpoint.
+:::
 
 ## Secrets
 
